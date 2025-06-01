@@ -7,14 +7,13 @@ from aiohttp_socks import ProxyConnector
 from fake_useragent import FakeUserAgent
 from datetime import datetime
 from colorama import *
-import asyncio, json, os, pytz
+import asyncio, base64, time, json, os, pytz
 
 wib = pytz.timezone('Asia/Jakarta')
 
 class DDAI:
     def __init__(self) -> None:
-        self.UA = FakeUserAgent().random
-        self.DASHBOARD_HEADERS = {
+        self.headers = {
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "en-US,en;q=0.9",
             "Origin": "https://app.ddai.network",
@@ -22,17 +21,7 @@ class DDAI:
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-site",
-            "User-Agent": self.UA
-        }
-        self.EXTENSION_HEADERS = {
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Origin": "chrome-extension://pigpomlidebemiifjihbgicepgbamdaj",
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-Storage-Access": "active",
-            "User-Agent": self.UA
+            "User-Agent": FakeUserAgent().random
         }
         self.BASE_API = "https://auth.ddai.network"
         self.proxies = []
@@ -80,18 +69,28 @@ class DDAI:
                 return []
         except json.JSONDecodeError:
             return []
-    
-    def save_accounts(self, tokens):
+
+    def save_accounts(self, new_accounts):
         filename = "tokens.json"
         try:
-            if not os.path.exists(filename):
-                self.log(f"{Fore.RED}File {filename} Not Found.{Style.RESET_ALL}")
-                return
-            
+            if not os.path.exists(filename) or os.path.getsize(filename) == 0:
+                existing_accounts = []
+            else:
+                with open(filename, 'r') as file:
+                    existing_accounts = json.load(file)
+
+            account_dict = {acc['Email']: acc for acc in existing_accounts}
+
+            for new_acc in new_accounts:
+                account_dict[new_acc['Email']] = new_acc
+
+            updated_accounts = list(account_dict.values())
+
             with open(filename, 'w') as file:
-                json.dump(tokens, file, indent=4)
+                json.dump(updated_accounts, file, indent=4)
+
         except Exception as e:
-            return None
+            return []
 
     async def load_proxies(self, use_proxy_choice: int):
         filename = "proxy.txt"
@@ -146,15 +145,32 @@ class DDAI:
         self.account_proxies[user_id] = proxy
         self.proxy_index = (self.proxy_index + 1) % len(self.proxies)
         return proxy
+    
+    def get_token_exp_time(self, token: str):
+        try:
+            header, payload, signature = token.split(".")
+            decoded_payload = base64.urlsafe_b64decode(payload + "==").decode("utf-8")
+            parsed_payload = json.loads(decoded_payload)
+            exp_time = parsed_payload["exp"]
+            
+            return exp_time
+        except Exception as e:
+            return None
             
     def biner_to_desimal(self, troughput: str):
         desimal = int(troughput, 2)
         return desimal
     
-    def print_message(self, user_id, proxy, color, message):
+    def mask_account(self, account):
+        if "@" in account:
+            local, domain = account.split('@', 1)
+            mask_account = local[:3] + '*' * 3 + local[-3:]
+            return f"{mask_account}@{domain}"
+    
+    def print_message(self, account, proxy, color, message):
         self.log(
-            f"{Fore.CYAN + Style.BRIGHT}[ User Id:{Style.RESET_ALL}"
-            f"{Fore.WHITE + Style.BRIGHT} {user_id} {Style.RESET_ALL}"
+            f"{Fore.CYAN + Style.BRIGHT}[ Account:{Style.RESET_ALL}"
+            f"{Fore.WHITE + Style.BRIGHT} {self.mask_account(account)} {Style.RESET_ALL}"
             f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
             f"{Fore.CYAN + Style.BRIGHT} Proxy: {Style.RESET_ALL}"
             f"{Fore.WHITE + Style.BRIGHT}{proxy}{Style.RESET_ALL}"
@@ -167,10 +183,10 @@ class DDAI:
     def print_question(self):
         while True:
             try:
-                print("1. Run With Monosans Proxy")
-                print("2. Run With Private Proxy")
-                print("3. Run Without Proxy")
-                choose = int(input("Choose [1/2/3] -> ").strip())
+                print(f"{Fore.WHITE + Style.BRIGHT}1. Run With Monosans Proxy{Style.RESET_ALL}")
+                print(f"{Fore.WHITE + Style.BRIGHT}2. Run With Private Proxy{Style.RESET_ALL}")
+                print(f"{Fore.WHITE + Style.BRIGHT}3. Run Without Proxy{Style.RESET_ALL}")
+                choose = int(input(f"{Fore.BLUE + Style.BRIGHT}Choose [1/2/3] -> {Style.RESET_ALL}").strip())
 
                 if choose in [1, 2, 3]:
                     proxy_type = (
@@ -179,17 +195,57 @@ class DDAI:
                         "Run Without Proxy"
                     )
                     print(f"{Fore.GREEN + Style.BRIGHT}{proxy_type} Selected.{Style.RESET_ALL}")
-                    return choose
+                    break
                 else:
                     print(f"{Fore.RED + Style.BRIGHT}Please enter either 1, 2 or 3.{Style.RESET_ALL}")
             except ValueError:
                 print(f"{Fore.RED + Style.BRIGHT}Invalid input. Enter a number (1, 2 or 3).{Style.RESET_ALL}")
 
-    async def auth_refresh(self, user_id: str, proxy=None, retries=5):
-        url = f"{self.BASE_API}/refresh"
-        data = json.dumps({"refreshToken":self.refresh_tokens[user_id]})
+        rotate = False
+        if choose in [1, 2]:
+            while True:
+                rotate = input(f"{Fore.BLUE + Style.BRIGHT}Rotate Invalid Proxy? [y/n] -> {Style.RESET_ALL}").strip()
+
+                if rotate in ["y", "n"]:
+                    rotate = rotate == "y"
+                    break
+                else:
+                    print(f"{Fore.RED + Style.BRIGHT}Invalid input. Enter 'y' or 'n'.{Style.RESET_ALL}")
+
+        return choose, rotate
+
+    async def onchain_trigger(self, user_id: str, proxy=None, retries=5):
+        url = f"{self.BASE_API}/onchainTrigger"
         headers = {
-            **self.DASHBOARD_HEADERS,
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Authorization": f"Bearer {self.access_tokens[user_id]}",
+            "Content-Length":"0",
+            "Origin": "chrome-extension://pigpomlidebemiifjihbgicepgbamdaj",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-Storage-Access": "active",
+            "User-Agent": FakeUserAgent().random
+        }
+        for attempt in range(retries):
+            connector = ProxyConnector.from_url(proxy) if proxy else None
+            try:
+                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
+                    async with session.post(url=url, headers=headers) as response:
+                        response.raise_for_status()
+                        return await response.json()
+            except (Exception, ClientResponseError) as e:
+                    if attempt < retries - 1:
+                        await asyncio.sleep(5)
+                        continue
+                    return self.print_message(user_id, proxy, Fore.YELLOW, f"Onchain Trigger Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
+
+    async def auth_refresh(self, email: str, proxy=None, retries=5):
+        url = f"{self.BASE_API}/refresh"
+        data = json.dumps({"refreshToken":self.refresh_tokens[email]})
+        headers = {
+            **self.headers,
             "Content-Length": str(len(data)),
             "Content-Type": "application/json"
         }
@@ -198,9 +254,14 @@ class DDAI:
             try:
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
                     async with session.post(url=url, headers=headers, data=data) as response:
-                        if response.status in [401, 403]:
-                            self.print_message(user_id, proxy, Fore.RED, "Refreshing Access Token Failed: "
-                                f"{Fore.YELLOW + Style.BRIGHT}Expired or Invalid{Style.RESET_ALL}"
+                        if response.status == 401:
+                            self.print_message(email, proxy, Fore.RED, "Refreshing Access Token Failed: "
+                                f"{Fore.YELLOW + Style.BRIGHT}Already Expired{Style.RESET_ALL}"
+                            )
+                            return None
+                        elif response.status == 431:
+                            self.print_message(email, proxy, Fore.RED, "Refreshing Access Token Failed: "
+                                f"{Fore.YELLOW + Style.BRIGHT}Invalid, PLEASE DON'T LOGOUT or OPENED DDAI DASHBOARD WHILE BOT RUNNING{Style.RESET_ALL}"
                             )
                             return None
                         response.raise_for_status()
@@ -209,32 +270,59 @@ class DDAI:
                     if attempt < retries - 1:
                         await asyncio.sleep(5)
                         continue
-                    return self.print_message(user_id, proxy, Fore.YELLOW, f"Refreshing Access Token Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
-    
-    async def mission_lists(self, user_id: str, proxy=None, retries=5):
-        url = f"{self.BASE_API}/missions"
+                    return self.print_message(email, proxy, Fore.YELLOW, f"Refreshing Access Token Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
+            
+    async def model_response(self, email: str, use_proxy: bool, rotate_proxy: bool, proxy=None, retries=5):
+        url = f"{self.BASE_API}/modelResponse"
         headers = {
-            **self.DASHBOARD_HEADERS,
-            "Authorization": f"Bearer {self.access_tokens[user_id]}"
+            **self.headers,
+            "Authorization": f"Bearer {self.access_tokens[email]}"
         }
         for attempt in range(retries):
             connector = ProxyConnector.from_url(proxy) if proxy else None
             try:
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
                     async with session.get(url=url, headers=headers) as response:
+                        if response.status == 401:
+                            await self.process_auth_refresh(email, use_proxy, rotate_proxy)
+                            headers["Authorization"] = f"Bearer {self.access_tokens[email]}"
+                            continue
                         response.raise_for_status()
                         return await response.json()
             except (Exception, ClientResponseError) as e:
                     if attempt < retries - 1:
                         await asyncio.sleep(5)
                         continue
-                    return self.print_message(user_id, proxy, Fore.YELLOW, f"GET Available Missions Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
+                    return self.print_message(email, proxy, Fore.YELLOW, f"GET Troughput Data Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
     
-    async def complete_missions(self, user_id: str, mission_id: str, title: str, proxy=None, retries=5):
+    async def mission_lists(self, email: str, use_proxy: bool, rotate_proxy: bool, proxy=None, retries=5):
+        url = f"{self.BASE_API}/missions"
+        headers = {
+            **self.headers,
+            "Authorization": f"Bearer {self.access_tokens[email]}"
+        }
+        for attempt in range(retries):
+            connector = ProxyConnector.from_url(proxy) if proxy else None
+            try:
+                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
+                    async with session.get(url=url, headers=headers) as response:
+                        if response.status == 401:
+                            await self.process_auth_refresh(email, use_proxy, rotate_proxy)
+                            headers["Authorization"] = f"Bearer {self.access_tokens[email]}"
+                            continue
+                        response.raise_for_status()
+                        return await response.json()
+            except (Exception, ClientResponseError) as e:
+                    if attempt < retries - 1:
+                        await asyncio.sleep(5)
+                        continue
+                    return self.print_message(email, proxy, Fore.YELLOW, f"GET Mission Lists Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
+    
+    async def complete_missions(self, email: str, mission_id: str, title: str, use_proxy: bool, rotate_proxy: bool, proxy=None, retries=5):
         url = f"{self.BASE_API}/missions/claim/{mission_id}"
         headers = {
-            **self.DASHBOARD_HEADERS,
-            "Authorization": f"Bearer {self.access_tokens[user_id]}",
+            **self.headers,
+            "Authorization": f"Bearer {self.access_tokens[email]}",
             "Content-Length":"0"
         }
         for attempt in range(retries):
@@ -242,88 +330,121 @@ class DDAI:
             try:
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
                     async with session.post(url=url, headers=headers) as response:
+                        if response.status == 401:
+                            await self.process_auth_refresh(email, use_proxy, rotate_proxy)
+                            headers["Authorization"] = f"Bearer {self.access_tokens[email]}"
+                            continue
                         response.raise_for_status()
                         return await response.json()
             except (Exception, ClientResponseError) as e:
                     if attempt < retries - 1:
                         await asyncio.sleep(5)
                         continue
-                    return self.print_message(user_id, proxy, Fore.WHITE, f"Mission {title}"
+                    return self.print_message(email, proxy, Fore.WHITE, f"Mission {title}"
                         f"{Fore.RED + Style.BRIGHT} Not Completed: {Style.RESET_ALL}"
                         f"{Fore.YELLOW + Style.BRIGHT}{str(e)}{Style.RESET_ALL}"
                     )
-            
-    async def model_response(self, user_id: str, proxy=None, retries=5):
-        url = f"{self.BASE_API}/modelResponse"
-        headers = {
-            **self.EXTENSION_HEADERS,
-            "Authorization": f"Bearer {self.access_tokens[user_id]}"
-        }
-        for attempt in range(retries):
-            connector = ProxyConnector.from_url(proxy) if proxy else None
-            try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.get(url=url, headers=headers) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
-                    if attempt < retries - 1:
-                        await asyncio.sleep(5)
-                        continue
-                    return self.print_message(user_id, proxy, Fore.YELLOW, f"GET Model Response Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
-    
-    async def onchain_trigger(self, user_id: str, proxy=None, retries=5):
-        url = f"{self.BASE_API}/onchainTrigger"
-        headers = {
-            **self.EXTENSION_HEADERS,
-            "Authorization": f"Bearer {self.access_tokens[user_id]}",
-            "Content-Length":"0"
-        }
-        for attempt in range(retries):
-            connector = ProxyConnector.from_url(proxy) if proxy else None
-            try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
-                    if attempt < retries - 1:
-                        await asyncio.sleep(5)
-                        continue
-                    return self.print_message(user_id, proxy, Fore.YELLOW, f"Perform Onchain Trigger Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
-            
-    async def process_auth_refresh(self, user_id: str, use_proxy: bool):
-        while True:
-            await asyncio.sleep(10 * 60)
 
-            proxy = self.get_next_proxy_for_account(user_id) if use_proxy else None
-            token = None
-            while token is None:
-                token = await self.auth_refresh(user_id, proxy)
-                if not token:
-                    proxy = self.rotate_proxy_for_account(user_id) if use_proxy else None
+    async def process_auth_refresh(self, email: str, use_proxy: bool, rotate_proxy: bool):
+        proxy = self.get_next_proxy_for_account(email) if use_proxy else None
+
+        if rotate_proxy:
+            while True:
+                refresh = await self.auth_refresh(email, proxy)
+                if not refresh:
+                    proxy = self.rotate_proxy_for_account(email)
                     await asyncio.sleep(5)
                     continue
 
-                self.access_tokens[user_id] = token["data"]["accessToken"]
+                self.access_tokens[email] = refresh["data"]["accessToken"]
 
-                self.print_message(user_id, proxy, Fore.GREEN, "Refreshing Access Token Success")
-
-                tokens = self.load_accounts()
-                if tokens:
-                    for token_entry in tokens:
-                        if token_entry["userId"] == user_id:
-                            token_entry["accessToken"] = self.access_tokens[user_id]
-
-                    self.save_accounts(tokens)
-                else:
-                    self.log(f"{Fore.RED + Style.BRIGHT}No Accounts Loaded.{Style.RESET_ALL}")
-
-    async def process_user_missions(self, user_id: str, use_proxy: bool):
+                self.save_accounts([{"Email":email, "accessToken":self.access_tokens[email], "refreshToken":self.refresh_tokens[email]}])
+                self.print_message(email, proxy, Fore.GREEN, "Refreshing Access Token Success")
+                return True
+            
         while True:
-            proxy = self.get_next_proxy_for_account(user_id) if use_proxy else None
+            refresh = await self.auth_refresh(email, proxy)
+            if not refresh:
+                proxy = self.rotate_proxy_for_account(email)
+                await asyncio.sleep(5)
+                continue
 
-            mission_lists = await self.mission_lists(user_id, proxy)
+            self.access_tokens[email] = refresh["data"]["accessToken"]
+            
+            self.save_accounts([{"Email":email, "accessToken":self.access_tokens[email], "refreshToken":self.refresh_tokens[email]}])
+            self.print_message(email, proxy, Fore.GREEN, "Refreshing Access Token Success")
+            return True
+        
+    async def check_token_exp_time(self, email: str, use_proxy: bool, rotate_proxy: bool):
+        exp_time = self.get_token_exp_time(self.access_tokens[email])
+
+        if int(time.time()) > exp_time:
+            proxy = self.get_next_proxy_for_account(email) if use_proxy else None
+
+            self.print_message(email, proxy, Fore.YELLOW, "Access Token Expired, Wait For Refreshing")
+            await self.process_auth_refresh(email, use_proxy, rotate_proxy)
+
+        return True
+
+    async def looping_auth_refresh(self, email: str, use_proxy: bool, rotate_proxy: bool):
+        while True:
+            await asyncio.sleep(10 * 60)
+            await self.process_auth_refresh(email, use_proxy, rotate_proxy)
+
+    async def process_onchain_trigger(self, email: str, use_proxy: bool, rotate_proxy: bool):
+        proxy = self.get_next_proxy_for_account(email) if use_proxy else None
+
+        if rotate_proxy:
+            while True:
+                model = await self.onchain_trigger(email, proxy)
+                if not model:
+                    proxy = self.rotate_proxy_for_account(email)
+                    await asyncio.sleep(5)
+                    continue
+
+                req_total = model.get("data", {}).get("requestsTotal", 0)
+                self.print_message(email, proxy, Fore.GREEN, "Onchain Triggered Successfully "
+                    f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
+                    f"{Fore.CYAN + Style.BRIGHT} Total Requests: {Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT}{req_total}{Style.RESET_ALL}"
+                )
+                return True
+            
+        while True:
+            model = await self.onchain_trigger(email, proxy)
+            if not model:
+                proxy = self.rotate_proxy_for_account(email)
+                await asyncio.sleep(5)
+                continue
+            
+            req_total = model.get("data", {}).get("requestsTotal", 0)
+            self.print_message(email, proxy, Fore.GREEN, "Onchain Triggered Successfully "
+                f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
+                f"{Fore.CYAN + Style.BRIGHT} Total Requests: {Style.RESET_ALL}"
+                f"{Fore.WHITE + Style.BRIGHT}{req_total}{Style.RESET_ALL}"
+            )
+            return True
+        
+    async def process_model_response(self, email: str, use_proxy: bool, rotate_proxy: bool):
+        while True:
+            proxy = self.get_next_proxy_for_account(email) if use_proxy else None
+
+            model = await self.model_response(email, use_proxy, rotate_proxy, proxy)
+            if model:
+                throughput = model.get("data", {}).get("throughput", 0)
+                formatted_throughput = self.biner_to_desimal(throughput)
+
+                self.print_message(email, proxy, Fore.GREEN, "Throughput "
+                    f"{Fore.WHITE + Style.BRIGHT}{formatted_throughput}%{Style.RESET_ALL}"
+                )
+
+            await asyncio.sleep(60)
+
+    async def process_user_missions(self, email: str, use_proxy: bool, rotate_proxy: bool):
+        while True:
+            proxy = self.get_next_proxy_for_account(email) if use_proxy else None
+
+            mission_lists = await self.mission_lists(email, use_proxy, rotate_proxy, proxy)
             if mission_lists:
                 missions = mission_lists.get("data", {}).get("missions", [])
 
@@ -340,9 +461,9 @@ class DDAI:
 
                             if type == 3:
                                 if status == "COMPLETED":
-                                    claim = await self.complete_missions(user_id, mission_id, title, proxy)
+                                    claim = await self.complete_missions(email, mission_id, title, use_proxy, rotate_proxy, proxy)
                                     if claim and claim.get("data", {}).get("claimed"):
-                                        self.print_message(user_id, proxy, Fore.WHITE, f"Mission {title}"
+                                        self.print_message(email, proxy, Fore.WHITE, f"Mission {title}"
                                             f"{Fore.GREEN + Style.BRIGHT} Is Completed {Style.RESET_ALL}"
                                             f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
                                             f"{Fore.CYAN + Style.BRIGHT} Reward: {Style.RESET_ALL}"
@@ -351,9 +472,9 @@ class DDAI:
                                 
                             else:
                                 if status == "PENDING":
-                                    claim = await self.complete_missions(user_id, mission_id, title, proxy)
+                                    claim = await self.complete_missions(email, mission_id, title, use_proxy, rotate_proxy, proxy)
                                     if claim and claim.get("data", {}).get("claimed"):
-                                        self.print_message(user_id, proxy, Fore.WHITE, f"Mission {title}"
+                                        self.print_message(email, proxy, Fore.WHITE, f"Mission {title}"
                                             f"{Fore.GREEN + Style.BRIGHT} Is Completed {Style.RESET_ALL}"
                                             f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
                                             f"{Fore.CYAN + Style.BRIGHT} Reward: {Style.RESET_ALL}"
@@ -363,55 +484,21 @@ class DDAI:
                             completed = True
 
                 if completed:
-                    self.print_message(user_id, proxy, Fore.GREEN, "All Available Mission Is Completed")
+                    self.print_message(email, proxy, Fore.GREEN, "All Available Mission Is Completed")
 
             await asyncio.sleep(24 * 60 * 60)
-
-    async def process_onchain_trigger(self, user_id: str, use_proxy: bool):
-        proxy = self.get_next_proxy_for_account(user_id) if use_proxy else None
-        trigger = None
-        while trigger is None:
-            trigger = await self.onchain_trigger(user_id, proxy)
-            if not trigger:
-                await asyncio.sleep(5)
-                continue
-
-            return trigger
         
-    async def process_model_response(self, user_id: str, use_proxy: bool):
-        is_triggered = await self.process_onchain_trigger(user_id, use_proxy)
-        if is_triggered:
-            proxy = self.get_next_proxy_for_account(user_id) if use_proxy else None
-            requests_total = is_triggered.get("data", {}).get("requestsTotal", 0)
-
-            self.print_message(user_id, proxy, Fore.GREEN, "Perform Onchain Trigger Success "
-                f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
-                f"{Fore.CYAN + Style.BRIGHT} Total Requests: {Style.RESET_ALL}"
-                f"{Fore.WHITE + Style.BRIGHT}{requests_total}{Style.RESET_ALL}"
-            )
-
-            while True:
-                proxy = self.get_next_proxy_for_account(user_id) if use_proxy else None
-
-                formatted_throughput = "N/A"
-                model = await self.model_response(user_id, proxy)
-                if model:
-                    throughput = model.get("data", {}).get("throughput", 0)
-                    formatted_throughput = self.biner_to_desimal(throughput)
-
-                    self.print_message(user_id, proxy, Fore.GREEN, "Throughput "
-                        f"{Fore.WHITE + Style.BRIGHT}{formatted_throughput}%{Style.RESET_ALL}"
-                    )
-
-                await asyncio.sleep(60)
-        
-    async def process_accounts(self, user_id: str, use_proxy: bool):
-        tasks = [
-            asyncio.create_task(self.process_auth_refresh(user_id, use_proxy)),
-            asyncio.create_task(self.process_user_missions(user_id, use_proxy)),
-            asyncio.create_task(self.process_model_response(user_id, use_proxy))
-        ]
-        await asyncio.gather(*tasks)
+    async def process_accounts(self, email: str, use_proxy: bool, rotate_proxy: bool):
+        is_valid = await self.check_token_exp_time(email, use_proxy, rotate_proxy)
+        if is_valid:
+            triggered = await self.process_onchain_trigger(email, use_proxy, rotate_proxy)
+            if triggered:
+                tasks = [
+                    asyncio.create_task(self.looping_auth_refresh(email, use_proxy, rotate_proxy)),
+                    asyncio.create_task(self.process_model_response(email, use_proxy, rotate_proxy)),
+                    asyncio.create_task(self.process_user_missions(email, use_proxy, rotate_proxy))
+                ]
+                await asyncio.gather(*tasks)
     
     async def main(self):
         try:
@@ -420,7 +507,7 @@ class DDAI:
                 self.log(f"{Fore.RED + Style.BRIGHT}No Accounts Loaded.{Style.RESET_ALL}")
                 return
             
-            use_proxy_choice = self.print_question()
+            use_proxy_choice, rotate_proxy = self.print_question()
 
             use_proxy = False
             if use_proxy_choice in [1, 2]:
@@ -436,21 +523,36 @@ class DDAI:
             if use_proxy:
                 await self.load_proxies(use_proxy_choice)
 
-            self.log(f"{Fore.CYAN + Style.BRIGHT}-{Style.RESET_ALL}"*75)
+            self.log(f"{Fore.CYAN + Style.BRIGHT}={Style.RESET_ALL}"*75)
 
-            while True:
-                tasks = []
-                for token in tokens:
-                    if token:
-                        user_id = token["userId"]
-                        self.access_tokens[user_id] = token["accessToken"]
-                        self.refresh_tokens[user_id] = token["refreshtoken"]
+            tasks = []
+            for token in tokens:
+                if token:
+                    email = token["Email"]
+                    access_token = token["accessToken"]
+                    refresh_token = token["refreshToken"]
 
-                        if user_id and self.access_tokens[user_id] and self.refresh_tokens[user_id]:
-                            tasks.append(asyncio.create_task(self.process_accounts(user_id, use_proxy)))
+                    if not "@" in email or not access_token or not refresh_token:
+                        continue
 
-                await asyncio.gather(*tasks)
-                await asyncio.sleep(10)
+                    exp_time = self.get_token_exp_time(refresh_token)
+                    if int(time.time()) > exp_time:
+                        self.log(
+                            f"{Fore.CYAN + Style.BRIGHT}[ Account:{Style.RESET_ALL}"
+                            f"{Fore.WHITE + Style.BRIGHT} {self.mask_account(email)} {Style.RESET_ALL}"
+                            f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
+                            f"{Fore.CYAN + Style.BRIGHT} Status: {Style.RESET_ALL}"
+                            f"{Fore.RED + Style.BRIGHT}Refresh Token Already Expired{Style.RESET_ALL}"
+                            f"{Fore.CYAN + Style.BRIGHT} ]{Style.RESET_ALL}"
+                        )
+                        continue
+
+                    self.access_tokens[email] = access_token
+                    self.refresh_tokens[email] = refresh_token
+
+                    tasks.append(asyncio.create_task(self.process_accounts(email, use_proxy, rotate_proxy)))
+
+            await asyncio.gather(*tasks)
 
         except Exception as e:
             self.log(f"{Fore.RED+Style.BRIGHT}Error: {e}{Style.RESET_ALL}")
