@@ -171,7 +171,8 @@ class DDAI:
             try:
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
 
-                    self.load_2captcha_key()
+                    if self.CAPTCHA_KEY is None:
+                        return
                     
                     url = f"http://2captcha.com/in.php?key={self.CAPTCHA_KEY}&method=turnstile&sitekey={self.SITE_KEY}&pageurl={self.PAGE_URL}"
                     async with session.get(url=url) as response:
@@ -203,8 +204,8 @@ class DDAI:
                                 elif res_result == "CAPCHA_NOT_READY":
                                     self.log(
                                         f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
-                                        f"{Fore.BLUE + Style.BRIGHT}Status :{Style.RESET_ALL}"
-                                        f"{Fore.YELLOW + Style.BRIGHT} Captcha Not Ready, Wait... {Style.RESET_ALL}"
+                                        f"{Fore.BLUE + Style.BRIGHT} Status : {Style.RESET_ALL}"
+                                        f"{Fore.YELLOW + Style.BRIGHT}Captcha Not Ready, Retrying...{Style.RESET_ALL}"
                                     )
                                     await asyncio.sleep(5)
                                     continue
@@ -285,6 +286,10 @@ class DDAI:
             if not accounts:
                 self.log(f"{Fore.RED + Style.BRIGHT}No Accounts Loaded.{Style.RESET_ALL}")
                 return
+            
+            capctha_key = self.load_2captcha_key()
+            if capctha_key:
+                self.CAPTCHA_KEY = capctha_key
             
             use_proxy_choice = self.print_question()
 
