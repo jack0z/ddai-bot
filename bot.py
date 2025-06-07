@@ -70,19 +70,19 @@ class DDAI:
         except json.JSONDecodeError:
             return []
 
-    def save_accounts(self, new_accounts):
+    def save_tokens(self, new_accounts):
         filename = "tokens.json"
         try:
-            if not os.path.exists(filename) or os.path.getsize(filename) == 0:
-                existing_accounts = []
-            else:
+            if os.path.exists(filename) and os.path.getsize(filename) > 0:
                 with open(filename, 'r') as file:
                     existing_accounts = json.load(file)
+            else:
+                existing_accounts = []
 
-            account_dict = {acc['Email']: acc for acc in existing_accounts}
+            account_dict = {acc["Email"]: acc for acc in existing_accounts}
 
             for new_acc in new_accounts:
-                account_dict[new_acc['Email']] = new_acc
+                account_dict[new_acc["Email"]] = new_acc
 
             updated_accounts = list(account_dict.values())
 
@@ -97,18 +97,18 @@ class DDAI:
         try:
             if use_proxy_choice == 1:
                 async with ClientSession(timeout=ClientTimeout(total=30)) as session:
-                    async with session.get("https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/all.txt") as response:
+                    async with session.get("https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text") as response:
                         response.raise_for_status()
                         content = await response.text()
                         with open(filename, 'w') as f:
                             f.write(content)
-                        self.proxies = content.splitlines()
+                        self.proxies = [line.strip() for line in content.splitlines() if line.strip()]
             else:
                 if not os.path.exists(filename):
                     self.log(f"{Fore.RED + Style.BRIGHT}File {filename} Not Found.{Style.RESET_ALL}")
                     return
                 with open(filename, 'r') as f:
-                    self.proxies = f.read().splitlines()
+                    self.proxies = [line.strip() for line in f.read().splitlines() if line.strip()]
             
             if not self.proxies:
                 self.log(f"{Fore.RED + Style.BRIGHT}No Proxies Found.{Style.RESET_ALL}")
@@ -183,18 +183,18 @@ class DDAI:
     def print_question(self):
         while True:
             try:
-                print(f"{Fore.WHITE + Style.BRIGHT}1. Run With Monosans Proxy{Style.RESET_ALL}")
+                print(f"{Fore.WHITE + Style.BRIGHT}1. Run With Free Proxyscrape Proxy{Style.RESET_ALL}")
                 print(f"{Fore.WHITE + Style.BRIGHT}2. Run With Private Proxy{Style.RESET_ALL}")
                 print(f"{Fore.WHITE + Style.BRIGHT}3. Run Without Proxy{Style.RESET_ALL}")
                 choose = int(input(f"{Fore.BLUE + Style.BRIGHT}Choose [1/2/3] -> {Style.RESET_ALL}").strip())
 
                 if choose in [1, 2, 3]:
                     proxy_type = (
-                        "Run With Monosans Proxy" if choose == 1 else 
-                        "Run With Private Proxy" if choose == 2 else 
-                        "Run Without Proxy"
+                        "With Free Proxyscrape" if choose == 1 else 
+                        "With Private" if choose == 2 else 
+                        "Without"
                     )
-                    print(f"{Fore.GREEN + Style.BRIGHT}{proxy_type} Selected.{Style.RESET_ALL}")
+                    print(f"{Fore.GREEN + Style.BRIGHT}Run {proxy_type} Proxy Selected.{Style.RESET_ALL}")
                     break
                 else:
                     print(f"{Fore.RED + Style.BRIGHT}Please enter either 1, 2 or 3.{Style.RESET_ALL}")
@@ -232,7 +232,7 @@ class DDAI:
             connector = ProxyConnector.from_url(proxy) if proxy else None
             try:
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers) as response:
+                    async with session.post(url=url, headers=headers, ssl=False) as response:
                         response.raise_for_status()
                         return await response.json()
             except (Exception, ClientResponseError) as e:
@@ -253,13 +253,13 @@ class DDAI:
             connector = ProxyConnector.from_url(proxy) if proxy else None
             try:
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers, data=data) as response:
+                    async with session.post(url=url, headers=headers, data=data, ssl=False) as response:
                         if response.status == 401:
                             self.print_message(email, proxy, Fore.RED, "Refreshing Access Token Failed: "
                                 f"{Fore.YELLOW + Style.BRIGHT}Already Expired{Style.RESET_ALL}"
                             )
                             return None
-                        elif response.status == 431:
+                        elif response.status == 403:
                             self.print_message(email, proxy, Fore.RED, "Refreshing Access Token Failed: "
                                 f"{Fore.YELLOW + Style.BRIGHT}Invalid, PLEASE DON'T LOGOUT or OPENED DDAI DASHBOARD WHILE BOT RUNNING{Style.RESET_ALL}"
                             )
@@ -282,7 +282,7 @@ class DDAI:
             connector = ProxyConnector.from_url(proxy) if proxy else None
             try:
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.get(url=url, headers=headers) as response:
+                    async with session.get(url=url, headers=headers, ssl=False) as response:
                         if response.status == 401:
                             await self.process_auth_refresh(email, use_proxy, rotate_proxy)
                             headers["Authorization"] = f"Bearer {self.access_tokens[email]}"
@@ -305,7 +305,7 @@ class DDAI:
             connector = ProxyConnector.from_url(proxy) if proxy else None
             try:
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.get(url=url, headers=headers) as response:
+                    async with session.get(url=url, headers=headers, ssl=False) as response:
                         if response.status == 401:
                             await self.process_auth_refresh(email, use_proxy, rotate_proxy)
                             headers["Authorization"] = f"Bearer {self.access_tokens[email]}"
@@ -329,7 +329,7 @@ class DDAI:
             connector = ProxyConnector.from_url(proxy) if proxy else None
             try:
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers) as response:
+                    async with session.post(url=url, headers=headers, ssl=False) as response:
                         if response.status == 401:
                             await self.process_auth_refresh(email, use_proxy, rotate_proxy)
                             headers["Authorization"] = f"Bearer {self.access_tokens[email]}"
@@ -346,34 +346,22 @@ class DDAI:
                     )
 
     async def process_auth_refresh(self, email: str, use_proxy: bool, rotate_proxy: bool):
-        proxy = self.get_next_proxy_for_account(email) if use_proxy else None
+        while True:
+            proxy = self.get_next_proxy_for_account(email) if use_proxy else None
 
-        if rotate_proxy:
-            while True:
-                refresh = await self.auth_refresh(email, proxy)
-                if not refresh:
-                    proxy = self.rotate_proxy_for_account(email)
-                    await asyncio.sleep(5)
-                    continue
-
+            refresh = await self.auth_refresh(email, proxy)
+            if refresh:
                 self.access_tokens[email] = refresh["data"]["accessToken"]
 
-                self.save_accounts([{"Email":email, "accessToken":self.access_tokens[email], "refreshToken":self.refresh_tokens[email]}])
+                self.save_tokens([{"Email":email, "accessToken":self.access_tokens[email], "refreshToken":self.refresh_tokens[email]}])
                 self.print_message(email, proxy, Fore.GREEN, "Refreshing Access Token Success")
                 return True
             
-        while True:
-            refresh = await self.auth_refresh(email, proxy)
-            if not refresh:
+            if rotate_proxy:
                 proxy = self.rotate_proxy_for_account(email)
-                await asyncio.sleep(5)
-                continue
 
-            self.access_tokens[email] = refresh["data"]["accessToken"]
-            
-            self.save_accounts([{"Email":email, "accessToken":self.access_tokens[email], "refreshToken":self.refresh_tokens[email]}])
-            self.print_message(email, proxy, Fore.GREEN, "Refreshing Access Token Success")
-            return True
+            await asyncio.sleep(5)
+            continue
         
     async def check_token_exp_time(self, email: str, use_proxy: bool, rotate_proxy: bool):
         exp_time = self.get_token_exp_time(self.access_tokens[email])
@@ -381,7 +369,7 @@ class DDAI:
         if int(time.time()) > exp_time:
             proxy = self.get_next_proxy_for_account(email) if use_proxy else None
 
-            self.print_message(email, proxy, Fore.YELLOW, "Access Token Expired, Wait For Refreshing")
+            self.print_message(email, proxy, Fore.YELLOW, "Access Token Expired, Refreshing...")
             await self.process_auth_refresh(email, use_proxy, rotate_proxy)
 
         return True
@@ -392,38 +380,26 @@ class DDAI:
             await self.process_auth_refresh(email, use_proxy, rotate_proxy)
 
     async def process_onchain_trigger(self, email: str, use_proxy: bool, rotate_proxy: bool):
-        proxy = self.get_next_proxy_for_account(email) if use_proxy else None
-
-        if rotate_proxy:
+        is_valid = await self.check_token_exp_time(email, use_proxy, rotate_proxy)
+        if is_valid:
             while True:
-                model = await self.onchain_trigger(email, proxy)
-                if not model:
-                    proxy = self.rotate_proxy_for_account(email)
-                    await asyncio.sleep(5)
-                    continue
+                proxy = self.get_next_proxy_for_account(email) if use_proxy else None
 
-                req_total = model.get("data", {}).get("requestsTotal", 0)
-                self.print_message(email, proxy, Fore.GREEN, "Onchain Triggered Successfully "
-                    f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.CYAN + Style.BRIGHT} Total Requests: {Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT}{req_total}{Style.RESET_ALL}"
-                )
-                return True
-            
-        while True:
-            model = await self.onchain_trigger(email, proxy)
-            if not model:
-                proxy = self.rotate_proxy_for_account(email)
+                model = await self.onchain_trigger(email, proxy)
+                if model:
+                    req_total = model.get("data", {}).get("requestsTotal", 0)
+                    self.print_message(email, proxy, Fore.GREEN, "Onchain Triggered Successfully "
+                        f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
+                        f"{Fore.CYAN + Style.BRIGHT} Total Requests: {Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT}{req_total}{Style.RESET_ALL}"
+                    )
+                    return True
+                
+                if rotate_proxy:
+                    proxy = self.rotate_proxy_for_account(email)
+
                 await asyncio.sleep(5)
                 continue
-            
-            req_total = model.get("data", {}).get("requestsTotal", 0)
-            self.print_message(email, proxy, Fore.GREEN, "Onchain Triggered Successfully "
-                f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
-                f"{Fore.CYAN + Style.BRIGHT} Total Requests: {Style.RESET_ALL}"
-                f"{Fore.WHITE + Style.BRIGHT}{req_total}{Style.RESET_ALL}"
-            )
-            return True
         
     async def process_model_response(self, email: str, use_proxy: bool, rotate_proxy: bool):
         while True:
@@ -483,22 +459,20 @@ class DDAI:
                         else:
                             completed = True
 
-                if completed:
-                    self.print_message(email, proxy, Fore.GREEN, "All Available Mission Is Completed")
+                    if completed:
+                        self.print_message(email, proxy, Fore.GREEN, "All Available Mission Is Completed")
 
             await asyncio.sleep(24 * 60 * 60)
         
     async def process_accounts(self, email: str, use_proxy: bool, rotate_proxy: bool):
-        is_valid = await self.check_token_exp_time(email, use_proxy, rotate_proxy)
-        if is_valid:
-            triggered = await self.process_onchain_trigger(email, use_proxy, rotate_proxy)
-            if triggered:
-                tasks = [
-                    asyncio.create_task(self.looping_auth_refresh(email, use_proxy, rotate_proxy)),
-                    asyncio.create_task(self.process_model_response(email, use_proxy, rotate_proxy)),
-                    asyncio.create_task(self.process_user_missions(email, use_proxy, rotate_proxy))
-                ]
-                await asyncio.gather(*tasks)
+        triggered = await self.process_onchain_trigger(email, use_proxy, rotate_proxy)
+        if triggered:
+            tasks = [
+                asyncio.create_task(self.looping_auth_refresh(email, use_proxy, rotate_proxy)),
+                asyncio.create_task(self.process_model_response(email, use_proxy, rotate_proxy)),
+                asyncio.create_task(self.process_user_missions(email, use_proxy, rotate_proxy))
+            ]
+            await asyncio.gather(*tasks)
     
     async def main(self):
         try:
@@ -526,24 +500,32 @@ class DDAI:
             self.log(f"{Fore.CYAN + Style.BRIGHT}={Style.RESET_ALL}"*75)
 
             tasks = []
-            for token in tokens:
+            for idx, token in enumerate(tokens, start=1):
                 if token:
                     email = token["Email"]
                     access_token = token["accessToken"]
                     refresh_token = token["refreshToken"]
 
                     if not "@" in email or not access_token or not refresh_token:
+                        self.log(
+                            f"{Fore.CYAN + Style.BRIGHT}[ Account: {Style.RESET_ALL}"
+                            f"{Fore.WHITE + Style.BRIGHT}{idx}{Style.RESET_ALL}"
+                            f"{Fore.MAGENTA + Style.BRIGHT} - {Style.RESET_ALL}"
+                            f"{Fore.CYAN + Style.BRIGHT}Status:{Style.RESET_ALL}"
+                            f"{Fore.RED + Style.BRIGHT} Invalid Account Data {Style.RESET_ALL}"
+                            f"{Fore.CYAN + Style.BRIGHT}]{Style.RESET_ALL}"
+                        )
                         continue
 
                     exp_time = self.get_token_exp_time(refresh_token)
                     if int(time.time()) > exp_time:
                         self.log(
-                            f"{Fore.CYAN + Style.BRIGHT}[ Account:{Style.RESET_ALL}"
-                            f"{Fore.WHITE + Style.BRIGHT} {self.mask_account(email)} {Style.RESET_ALL}"
-                            f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
-                            f"{Fore.CYAN + Style.BRIGHT} Status: {Style.RESET_ALL}"
-                            f"{Fore.RED + Style.BRIGHT}Refresh Token Already Expired{Style.RESET_ALL}"
-                            f"{Fore.CYAN + Style.BRIGHT} ]{Style.RESET_ALL}"
+                            f"{Fore.CYAN + Style.BRIGHT}[ Account: {Style.RESET_ALL}"
+                            f"{Fore.WHITE + Style.BRIGHT}{idx}{Style.RESET_ALL}"
+                            f"{Fore.MAGENTA + Style.BRIGHT} - {Style.RESET_ALL}"
+                            f"{Fore.CYAN + Style.BRIGHT}Status:{Style.RESET_ALL}"
+                            f"{Fore.RED + Style.BRIGHT} Refresh Token Already Expired {Style.RESET_ALL}"
+                            f"{Fore.CYAN + Style.BRIGHT}]{Style.RESET_ALL}"
                         )
                         continue
 

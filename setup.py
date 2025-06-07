@@ -31,7 +31,7 @@ class DDAI:
         self.proxy_index = 0
         self.account_proxies = {}
         self.captcha_tokens = {}
-        self.tokens = []
+        self.password = {}
 
     def clear_terminal(self):
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -46,7 +46,7 @@ class DDAI:
     def welcome(self):
         print(
             f"""
-        {Fore.GREEN + Style.BRIGHT}Auto Ping {Fore.BLUE + Style.BRIGHT}DDAI Network - BOT
+        {Fore.GREEN + Style.BRIGHT}Auto Setup {Fore.BLUE + Style.BRIGHT}DDAI Network - BOT
             """
             f"""
         {Fore.GREEN + Style.BRIGHT}Rey? {Fore.YELLOW + Style.BRIGHT}<INI WATERMARK>
@@ -72,21 +72,35 @@ class DDAI:
                 return []
         except json.JSONDecodeError:
             return []
-
-    def save_tokens(self, tokens):
+        
+    def save_tokens(self, new_accounts):
         filename = "tokens.json"
         try:
+            if os.path.exists(filename) and os.path.getsize(filename) > 0:
+                with open(filename, 'r') as file:
+                    existing_accounts = json.load(file)
+            else:
+                existing_accounts = []
+
+            account_dict = {acc["Email"]: acc for acc in existing_accounts}
+
+            for new_acc in new_accounts:
+                account_dict[new_acc["Email"]] = new_acc
+
+            updated_accounts = list(account_dict.values())
+
             with open(filename, 'w') as file:
-                json.dump(tokens, file, indent=4)
+                json.dump(updated_accounts, file, indent=4)
+
         except Exception as e:
-            return None
+            return []
         
     def load_2captcha_key(self):
         try:
             with open("2captcha_key.txt", 'r') as file:
                 captcha_key = file.read().strip()
 
-            self.CAPTCHA_KEY = captcha_key
+            return captcha_key
         except Exception as e:
             return None
 
@@ -95,18 +109,18 @@ class DDAI:
         try:
             if use_proxy_choice == 1:
                 async with ClientSession(timeout=ClientTimeout(total=30)) as session:
-                    async with session.get("https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/all.txt") as response:
+                    async with session.get("https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text") as response:
                         response.raise_for_status()
                         content = await response.text()
                         with open(filename, 'w') as f:
                             f.write(content)
-                        self.proxies = content.splitlines()
+                        self.proxies = [line.strip() for line in content.splitlines() if line.strip()]
             else:
                 if not os.path.exists(filename):
                     self.log(f"{Fore.RED + Style.BRIGHT}File {filename} Not Found.{Style.RESET_ALL}")
                     return
                 with open(filename, 'r') as f:
-                    self.proxies = f.read().splitlines()
+                    self.proxies = [line.strip() for line in f.read().splitlines() if line.strip()]
             
             if not self.proxies:
                 self.log(f"{Fore.RED + Style.BRIGHT}No Proxies Found.{Style.RESET_ALL}")
@@ -147,18 +161,18 @@ class DDAI:
     def print_question(self):
         while True:
             try:
-                print(f"{Fore.WHITE + Style.BRIGHT}1. Run With Monosans Proxy{Style.RESET_ALL}")
+                print(f"{Fore.WHITE + Style.BRIGHT}1. Run With Free Proxyscrape Proxy{Style.RESET_ALL}")
                 print(f"{Fore.WHITE + Style.BRIGHT}2. Run With Private Proxy{Style.RESET_ALL}")
                 print(f"{Fore.WHITE + Style.BRIGHT}3. Run Without Proxy{Style.RESET_ALL}")
                 choose = int(input(f"{Fore.BLUE + Style.BRIGHT}Choose [1/2/3] -> {Style.RESET_ALL}").strip())
 
                 if choose in [1, 2, 3]:
                     proxy_type = (
-                        "Run With Monosans Proxy" if choose == 1 else 
-                        "Run With Private Proxy" if choose == 2 else 
-                        "Run Without Proxy"
+                        "With Free Proxyscrape" if choose == 1 else 
+                        "With Private" if choose == 2 else 
+                        "Without"
                     )
-                    print(f"{Fore.GREEN + Style.BRIGHT}{proxy_type} Selected.{Style.RESET_ALL}")
+                    print(f"{Fore.GREEN + Style.BRIGHT}Run {proxy_type} Proxy Selected.{Style.RESET_ALL}")
                     return choose
                 else:
                     print(f"{Fore.RED + Style.BRIGHT}Please enter either 1, 2 or 3.{Style.RESET_ALL}")
@@ -172,7 +186,7 @@ class DDAI:
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
 
                     if self.CAPTCHA_KEY is None:
-                        return
+                        return None
                     
                     url = f"http://2captcha.com/in.php?key={self.CAPTCHA_KEY}&method=turnstile&sitekey={self.SITE_KEY}&pageurl={self.PAGE_URL}"
                     async with session.get(url=url) as response:
@@ -187,7 +201,7 @@ class DDAI:
 
                         self.log(
                             f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
-                            f"{Fore.BLUE + Style.BRIGHT} Req Id : {Style.RESET_ALL}"
+                            f"{Fore.BLUE + Style.BRIGHT} Req Id: {Style.RESET_ALL}"
                             f"{Fore.WHITE + Style.BRIGHT}{request_id}{Style.RESET_ALL}"
                         )
 
@@ -204,8 +218,8 @@ class DDAI:
                                 elif res_result == "CAPCHA_NOT_READY":
                                     self.log(
                                         f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
-                                        f"{Fore.BLUE + Style.BRIGHT} Status : {Style.RESET_ALL}"
-                                        f"{Fore.YELLOW + Style.BRIGHT}Captcha Not Ready, Retrying...{Style.RESET_ALL}"
+                                        f"{Fore.BLUE + Style.BRIGHT} Status: {Style.RESET_ALL}"
+                                        f"{Fore.YELLOW + Style.BRIGHT}Captcha Not Ready{Style.RESET_ALL}"
                                     )
                                     await asyncio.sleep(5)
                                     continue
@@ -218,9 +232,9 @@ class DDAI:
                     continue
                 return None
 
-    async def auth_login(self, email: str, password: str, proxy=None, retries=5):
+    async def auth_login(self, email: str, proxy=None, retries=5):
         url = f"{self.BASE_API}/login"
-        data = json.dumps({"email":email, "password":password, "captchaToken":self.captcha_tokens[email]})
+        data = json.dumps({"email":email, "password":self.password[email], "captchaToken":self.captcha_tokens[email]})
         headers = {
             **self.headers,
             "Content-Length": str(len(data)),
@@ -230,54 +244,55 @@ class DDAI:
             connector = ProxyConnector.from_url(proxy) if proxy else None
             try:
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers, data=data) as response:
+                    async with session.post(url=url, headers=headers, data=data, ssl=False) as response:
                         response.raise_for_status()
                         return await response.json()
             except (Exception, ClientResponseError) as e:
                     if attempt < retries - 1:
                         await asyncio.sleep(5)
                         continue
-                    return None
-            
-    async def process_accounts(self, email: str, password: str, use_proxy: bool):
+                    return self.log(
+                        f"{Fore.CYAN+Style.BRIGHT}Status :{Style.RESET_ALL}"
+                        f"{Fore.RED+Style.BRIGHT} Login Failed {Style.RESET_ALL}"
+                        f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
+                        f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
+                    )
+        
+    async def process_accounts(self, email: str, use_proxy: bool):
         proxy = self.get_next_proxy_for_account(email) if use_proxy else None
+    
         self.log(
             f"{Fore.CYAN + Style.BRIGHT}Proxy  :{Style.RESET_ALL}"
             f"{Fore.WHITE + Style.BRIGHT} {proxy} {Style.RESET_ALL}"
         )
-        
+
         self.log(f"{Fore.CYAN + Style.BRIGHT}Captcha:{Style.RESET_ALL}")
 
         cf_solved = await self.solve_cf_turnstile(email, proxy)
-        if cf_solved:
+        if not cf_solved:
             self.log(
                 f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
-                f"{Fore.BLUE + Style.BRIGHT} Status : {Style.RESET_ALL}"
-                f"{Fore.GREEN + Style.BRIGHT}Solved{Style.RESET_ALL}"
-            )
-        
-            login = await self.auth_login(email, password, proxy)
-            if login and login.get("status") == "success":
-                access_token = login["data"]["accessToken"]
-                refresh_token = login["data"]["refreshToken"]
-
-                self.tokens.append({"Email":email, "accessToken":access_token, "refreshToken":refresh_token})
-
-                self.log(
-                    f"{Fore.CYAN + Style.BRIGHT}Status :{Style.RESET_ALL}"
-                    f"{Fore.GREEN + Style.BRIGHT} Token Saved Successfully {Style.RESET_ALL}"
-                )
-            else:
-                self.log(
-                    f"{Fore.CYAN + Style.BRIGHT}Status :{Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT} Login Failed {Style.RESET_ALL}"
-                )
-
-        else:
-            self.log(
-                f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
-                f"{Fore.BLUE + Style.BRIGHT} Status : {Style.RESET_ALL}"
+                f"{Fore.BLUE + Style.BRIGHT} Status: {Style.RESET_ALL}"
                 f"{Fore.RED + Style.BRIGHT}Not Solved{Style.RESET_ALL}"
+            )
+            return
+        
+        self.log(
+            f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
+            f"{Fore.BLUE + Style.BRIGHT} Status: {Style.RESET_ALL}"
+            f"{Fore.GREEN + Style.BRIGHT}Solved{Style.RESET_ALL}"
+        )
+    
+        login = await self.auth_login(email, proxy)
+        if login and login.get("status") == "success":
+            access_token = login["data"]["accessToken"]
+            refresh_token = login["data"]["refreshToken"]
+
+            self.save_tokens([{"Email":email, "accessToken":access_token, "refreshToken":refresh_token}])
+
+            self.log(
+                f"{Fore.CYAN + Style.BRIGHT}Status :{Style.RESET_ALL}"
+                f"{Fore.GREEN + Style.BRIGHT} Token Have Been Saved Successfully {Style.RESET_ALL}"
             )
     
     async def main(self):
@@ -321,7 +336,10 @@ class DDAI:
                     )
 
                     if not "@" in email or not password:
-                        self.log(f"{Fore.RED + Style.BRIGHT}Invalid Email or Password{Style.RESET_ALL}")
+                        self.log(
+                            f"{Fore.CYAN+Style.BRIGHT}Status :{Style.RESET_ALL}"
+                            f"{Fore.RED+Style.BRIGHT} Invalid Account Data {Style.RESET_ALL}"
+                        )
                         continue
 
                     self.log(
@@ -329,10 +347,11 @@ class DDAI:
                         f"{Fore.WHITE + Style.BRIGHT} {email} {Style.RESET_ALL}"
                     )
 
-                    await self.process_accounts(email, password, use_proxy)
-                    await asyncio.sleep(5)
+                    self.password[email] = password
 
-            self.save_tokens(self.tokens)
+                    await self.process_accounts(email, use_proxy)
+                    await asyncio.sleep(3)
+
             self.log(f"{Fore.CYAN + Style.BRIGHT}={Style.RESET_ALL}"*68)
 
         except Exception as e:
