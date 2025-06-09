@@ -157,6 +157,12 @@ class DDAI:
         self.account_proxies[user_id] = proxy
         self.proxy_index = (self.proxy_index + 1) % len(self.proxies)
         return proxy
+    
+    def mask_account(self, account):
+        if '@' in account:
+            local, domain = account.split('@', 1)
+            mask_account = local[:3] + '*' * 3 + local[-3:]
+            return f"{mask_account}@{domain}"
 
     def print_question(self):
         while True:
@@ -248,15 +254,17 @@ class DDAI:
                         response.raise_for_status()
                         return await response.json()
             except (Exception, ClientResponseError) as e:
-                    if attempt < retries - 1:
-                        await asyncio.sleep(5)
-                        continue
-                    return self.log(
-                        f"{Fore.CYAN+Style.BRIGHT}Status :{Style.RESET_ALL}"
-                        f"{Fore.RED+Style.BRIGHT} Login Failed {Style.RESET_ALL}"
-                        f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                        f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
-                    )
+                if attempt < retries - 1:
+                    await asyncio.sleep(5)
+                    continue
+                self.log(
+                    f"{Fore.CYAN+Style.BRIGHT}Status :{Style.RESET_ALL}"
+                    f"{Fore.RED+Style.BRIGHT} Login Failed {Style.RESET_ALL}"
+                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
+                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
+                )
+
+        return None
         
     async def process_accounts(self, email: str, use_proxy: bool):
         proxy = self.get_next_proxy_for_account(email) if use_proxy else None
@@ -344,7 +352,7 @@ class DDAI:
 
                     self.log(
                         f"{Fore.CYAN + Style.BRIGHT}Account:{Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT} {email} {Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} {self.mask_account(email)} {Style.RESET_ALL}"
                     )
 
                     self.password[email] = password

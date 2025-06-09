@@ -236,10 +236,12 @@ class DDAI:
                         response.raise_for_status()
                         return await response.json()
             except (Exception, ClientResponseError) as e:
-                    if attempt < retries - 1:
-                        await asyncio.sleep(5)
-                        continue
-                    return self.print_message(user_id, proxy, Fore.YELLOW, f"Onchain Trigger Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
+                if attempt < retries - 1:
+                    await asyncio.sleep(5)
+                    continue
+                self.print_message(user_id, proxy, Fore.YELLOW, f"Onchain Trigger Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
+
+        return None
 
     async def auth_refresh(self, email: str, proxy=None, retries=5):
         url = f"{self.BASE_API}/refresh"
@@ -267,10 +269,12 @@ class DDAI:
                         response.raise_for_status()
                         return await response.json()
             except (Exception, ClientResponseError) as e:
-                    if attempt < retries - 1:
-                        await asyncio.sleep(5)
-                        continue
-                    return self.print_message(email, proxy, Fore.YELLOW, f"Refreshing Access Token Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
+                if attempt < retries - 1:
+                    await asyncio.sleep(5)
+                    continue
+                self.print_message(email, proxy, Fore.YELLOW, f"Refreshing Access Token Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
+
+        return None
             
     async def model_response(self, email: str, use_proxy: bool, rotate_proxy: bool, proxy=None, retries=5):
         url = f"{self.BASE_API}/modelResponse"
@@ -290,10 +294,12 @@ class DDAI:
                         response.raise_for_status()
                         return await response.json()
             except (Exception, ClientResponseError) as e:
-                    if attempt < retries - 1:
-                        await asyncio.sleep(5)
-                        continue
-                    return self.print_message(email, proxy, Fore.YELLOW, f"GET Troughput Data Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
+                if attempt < retries - 1:
+                    await asyncio.sleep(5)
+                    continue
+                self.print_message(email, proxy, Fore.YELLOW, f"GET Troughput Data Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
+
+        return None
     
     async def mission_lists(self, email: str, use_proxy: bool, rotate_proxy: bool, proxy=None, retries=5):
         url = f"{self.BASE_API}/missions"
@@ -313,10 +319,12 @@ class DDAI:
                         response.raise_for_status()
                         return await response.json()
             except (Exception, ClientResponseError) as e:
-                    if attempt < retries - 1:
-                        await asyncio.sleep(5)
-                        continue
-                    return self.print_message(email, proxy, Fore.YELLOW, f"GET Mission Lists Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
+                if attempt < retries - 1:
+                    await asyncio.sleep(5)
+                    continue
+                self.print_message(email, proxy, Fore.YELLOW, f"GET Mission Lists Failed: {Fore.RED+Style.BRIGHT}{str(e)}")
+
+        return None
     
     async def complete_missions(self, email: str, mission_id: str, title: str, use_proxy: bool, rotate_proxy: bool, proxy=None, retries=5):
         url = f"{self.BASE_API}/missions/claim/{mission_id}"
@@ -337,13 +345,15 @@ class DDAI:
                         response.raise_for_status()
                         return await response.json()
             except (Exception, ClientResponseError) as e:
-                    if attempt < retries - 1:
-                        await asyncio.sleep(5)
-                        continue
-                    return self.print_message(email, proxy, Fore.WHITE, f"Mission {title}"
-                        f"{Fore.RED + Style.BRIGHT} Not Completed: {Style.RESET_ALL}"
-                        f"{Fore.YELLOW + Style.BRIGHT}{str(e)}{Style.RESET_ALL}"
-                    )
+                if attempt < retries - 1:
+                    await asyncio.sleep(5)
+                    continue
+                self.print_message(email, proxy, Fore.WHITE, f"Mission {title}"
+                    f"{Fore.RED + Style.BRIGHT} Not Completed: {Style.RESET_ALL}"
+                    f"{Fore.YELLOW + Style.BRIGHT}{str(e)}{Style.RESET_ALL}"
+                )
+
+        return None
 
     async def process_auth_refresh(self, email: str, use_proxy: bool, rotate_proxy: bool):
         while True:
