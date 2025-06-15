@@ -1,9 +1,4 @@
-from aiohttp import (
-    ClientResponseError,
-    ClientSession,
-    ClientTimeout
-)
-from aiohttp_socks import ProxyConnector
+from curl_cffi import requests
 from fake_useragent import FakeUserAgent
 from datetime import datetime
 from colorama import *
@@ -96,13 +91,12 @@ class DDAI:
         filename = "proxy.txt"
         try:
             if use_proxy_choice == 1:
-                async with ClientSession(timeout=ClientTimeout(total=30)) as session:
-                    async with session.get("https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text") as response:
-                        response.raise_for_status()
-                        content = await response.text()
-                        with open(filename, 'w') as f:
-                            f.write(content)
-                        self.proxies = [line.strip() for line in content.splitlines() if line.strip()]
+                response = await asyncio.to_thread(requests.get, "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text")
+                response.raise_for_status()
+                content = response.text
+                with open(filename, 'w') as f:
+                    f.write(content)
+                self.proxies = [line.strip() for line in content.splitlines() if line.strip()]
             else:
                 if not os.path.exists(filename):
                     self.log(f"{Fore.RED + Style.BRIGHT}File {filename} Not Found.{Style.RESET_ALL}")
@@ -229,13 +223,11 @@ class DDAI:
             "User-Agent": FakeUserAgent().random
         }
         for attempt in range(retries):
-            connector = ProxyConnector.from_url(proxy) if proxy else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers, ssl=False) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(requests.post, url=url, headers=headers, proxy=proxy, timeout=60, impersonate="chrome110", verify=False)
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
@@ -252,23 +244,21 @@ class DDAI:
             "Content-Type": "application/json"
         }
         for attempt in range(retries):
-            connector = ProxyConnector.from_url(proxy) if proxy else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers, data=data, ssl=False) as response:
-                        if response.status == 401:
-                            self.print_message(email, proxy, Fore.RED, "Refreshing Access Token Failed: "
-                                f"{Fore.YELLOW + Style.BRIGHT}Already Expired{Style.RESET_ALL}"
-                            )
-                            return None
-                        elif response.status == 403:
-                            self.print_message(email, proxy, Fore.RED, "Refreshing Access Token Failed: "
-                                f"{Fore.YELLOW + Style.BRIGHT}Invalid, PLEASE DON'T LOGOUT or OPENED DDAI DASHBOARD WHILE BOT RUNNING{Style.RESET_ALL}"
-                            )
-                            return None
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(requests.post, url=url, headers=headers, data=data, proxy=proxy, timeout=60, impersonate="chrome110", verify=False)
+                if response.status_code == 401:
+                    self.print_message(email, proxy, Fore.RED, "Refreshing Access Token Failed: "
+                        f"{Fore.YELLOW + Style.BRIGHT}Already Expired{Style.RESET_ALL}"
+                    )
+                    return None
+                elif response.status_code == 403:
+                    self.print_message(email, proxy, Fore.RED, "Refreshing Access Token Failed: "
+                        f"{Fore.YELLOW + Style.BRIGHT}Invalid, PLEASE DON'T LOGOUT or OPENED DDAI DASHBOARD WHILE BOT RUNNING{Style.RESET_ALL}"
+                    )
+                    return None
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
@@ -283,17 +273,15 @@ class DDAI:
             "Authorization": f"Bearer {self.access_tokens[email]}"
         }
         for attempt in range(retries):
-            connector = ProxyConnector.from_url(proxy) if proxy else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.get(url=url, headers=headers, ssl=False) as response:
-                        if response.status == 401:
-                            await self.process_auth_refresh(email, use_proxy, rotate_proxy)
-                            headers["Authorization"] = f"Bearer {self.access_tokens[email]}"
-                            continue
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(requests.get, url=url, headers=headers, proxy=proxy, timeout=60, impersonate="chrome110", verify=False)
+                if response.status_code == 401:
+                    await self.process_auth_refresh(email, use_proxy, rotate_proxy)
+                    headers["Authorization"] = f"Bearer {self.access_tokens[email]}"
+                    continue
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
@@ -308,17 +296,15 @@ class DDAI:
             "Authorization": f"Bearer {self.access_tokens[email]}"
         }
         for attempt in range(retries):
-            connector = ProxyConnector.from_url(proxy) if proxy else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.get(url=url, headers=headers, ssl=False) as response:
-                        if response.status == 401:
-                            await self.process_auth_refresh(email, use_proxy, rotate_proxy)
-                            headers["Authorization"] = f"Bearer {self.access_tokens[email]}"
-                            continue
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(requests.get, url=url, headers=headers, proxy=proxy, timeout=60, impersonate="chrome110", verify=False)
+                if response.status_code == 401:
+                    await self.process_auth_refresh(email, use_proxy, rotate_proxy)
+                    headers["Authorization"] = f"Bearer {self.access_tokens[email]}"
+                    continue
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
@@ -334,17 +320,15 @@ class DDAI:
             "Content-Length":"0"
         }
         for attempt in range(retries):
-            connector = ProxyConnector.from_url(proxy) if proxy else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers, ssl=False) as response:
-                        if response.status == 401:
-                            await self.process_auth_refresh(email, use_proxy, rotate_proxy)
-                            headers["Authorization"] = f"Bearer {self.access_tokens[email]}"
-                            continue
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(requests.post, url=url, headers=headers, proxy=proxy, timeout=60, impersonate="chrome110", verify=False)
+                if response.status_code == 401:
+                    await self.process_auth_refresh(email, use_proxy, rotate_proxy)
+                    headers["Authorization"] = f"Bearer {self.access_tokens[email]}"
+                    continue
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue

@@ -1,9 +1,4 @@
-from aiohttp import (
-    ClientResponseError,
-    ClientSession,
-    ClientTimeout
-)
-from aiohttp_socks import ProxyConnector
+from curl_cffi import requests
 from fake_useragent import FakeUserAgent
 from datetime import datetime
 from colorama import *
@@ -108,13 +103,12 @@ class DDAI:
         filename = "proxy.txt"
         try:
             if use_proxy_choice == 1:
-                async with ClientSession(timeout=ClientTimeout(total=30)) as session:
-                    async with session.get("https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text") as response:
-                        response.raise_for_status()
-                        content = await response.text()
-                        with open(filename, 'w') as f:
-                            f.write(content)
-                        self.proxies = [line.strip() for line in content.splitlines() if line.strip()]
+                response = await asyncio.to_thread(requests.get, "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text")
+                response.raise_for_status()
+                content = response.text
+                with open(filename, 'w') as f:
+                    f.write(content)
+                self.proxies = [line.strip() for line in content.splitlines() if line.strip()]
             else:
                 if not os.path.exists(filename):
                     self.log(f"{Fore.RED + Style.BRIGHT}File {filename} Not Found.{Style.RESET_ALL}")
@@ -187,52 +181,49 @@ class DDAI:
     
     async def solve_cf_turnstile(self, email: str, proxy=None, retries=5):
         for attempt in range(retries):
-            connector = ProxyConnector.from_url(proxy) if proxy else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-
-                    if self.CAPTCHA_KEY is None:
-                        return None
+                if self.CAPTCHA_KEY is None:
+                    return None
                     
-                    url = f"http://2captcha.com/in.php?key={self.CAPTCHA_KEY}&method=turnstile&sitekey={self.SITE_KEY}&pageurl={self.PAGE_URL}"
-                    async with session.get(url=url) as response:
-                        response.raise_for_status()
-                        result = await response.text()
+                url = f"http://2captcha.com/in.php?key={self.CAPTCHA_KEY}&method=turnstile&sitekey={self.SITE_KEY}&pageurl={self.PAGE_URL}"
+                response = await asyncio.to_thread(requests.get, url=url, proxy=proxy, timeout=60, impersonate="chrome110", verify=False)
+                response.raise_for_status()
+                result = response.text
 
-                        if 'OK|' not in result:
-                            await asyncio.sleep(5)
-                            continue
+                if 'OK|' not in result:
+                    await asyncio.sleep(5)
+                    continue
 
-                        request_id = result.split('|')[1]
+                request_id = result.split('|')[1]
 
+                self.log(
+                    f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
+                    f"{Fore.BLUE + Style.BRIGHT} Req Id: {Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT}{request_id}{Style.RESET_ALL}"
+                )
+
+                for _ in range(30):
+                    res_url = f"http://2captcha.com/res.php?key={self.CAPTCHA_KEY}&action=get&id={request_id}"
+                    res_response = await asyncio.to_thread(requests.get, url=res_url, proxy=proxy, timeout=60, impersonate="chrome110", verify=False)
+                    res_response.raise_for_status()
+                    res_result = res_response.text
+
+                    if 'OK|' in res_result:
+                        captcha_token = res_result.split('|')[1]
+                        self.captcha_tokens[email] = captcha_token
+                        return True
+                    elif res_result == "CAPCHA_NOT_READY":
                         self.log(
                             f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
-                            f"{Fore.BLUE + Style.BRIGHT} Req Id: {Style.RESET_ALL}"
-                            f"{Fore.WHITE + Style.BRIGHT}{request_id}{Style.RESET_ALL}"
+                            f"{Fore.BLUE + Style.BRIGHT} Status: {Style.RESET_ALL}"
+                            f"{Fore.YELLOW + Style.BRIGHT}Captcha Not Ready{Style.RESET_ALL}"
                         )
+                        await asyncio.sleep(5)
+                        continue
+                    else:
+                        break
 
-                        for _ in range(30):
-                            res_url = f"http://2captcha.com/res.php?key={self.CAPTCHA_KEY}&action=get&id={request_id}"
-                            async with session.get(url=res_url) as res_response:
-                                res_response.raise_for_status()
-                                res_result = await res_response.text()
-
-                                if 'OK|' in res_result:
-                                    captcha_token = res_result.split('|')[1]
-                                    self.captcha_tokens[email] = captcha_token
-                                    return True
-                                elif res_result == "CAPCHA_NOT_READY":
-                                    self.log(
-                                        f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
-                                        f"{Fore.BLUE + Style.BRIGHT} Status: {Style.RESET_ALL}"
-                                        f"{Fore.YELLOW + Style.BRIGHT}Captcha Not Ready{Style.RESET_ALL}"
-                                    )
-                                    await asyncio.sleep(5)
-                                    continue
-                                else:
-                                    break
-
-            except (Exception, ClientResponseError) as e:
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
@@ -247,13 +238,11 @@ class DDAI:
             "Content-Type": "application/json"
         }
         for attempt in range(retries):
-            connector = ProxyConnector.from_url(proxy) if proxy else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers, data=data, ssl=False) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(requests.post, url=url, headers=headers, data=data, proxy=proxy, timeout=60, impersonate="chrome110", verify=False)
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
