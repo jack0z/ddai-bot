@@ -92,6 +92,36 @@ class DDAI:
         except json.JSONDecodeError:
             return []
         
+    def is_template_account(self, account):
+        """Check if an account entry is a template/placeholder"""
+        email = account.get("Email", "").lower()
+        access_token = account.get("accessToken", "")
+        refresh_token = account.get("refreshToken", "")
+        
+        # Check for template email patterns
+        template_email_patterns = [
+            "your_email", "your.email", "youremail", 
+            "example@", "sample@", "test@"
+        ]
+        
+        # Check for template token patterns
+        template_token_patterns = [
+            "SAMPLE_ACCESS_TOKEN_HERE", "SAMPLE_REFRESH_TOKEN_HERE", 
+            "SIGNATURE_PART", "YOUR_TOKEN_HERE", "PLACEHOLDER"
+        ]
+        
+        # Check email patterns
+        for pattern in template_email_patterns:
+            if pattern in email:
+                return True
+        
+        # Check token patterns
+        for pattern in template_token_patterns:
+            if pattern in access_token or pattern in refresh_token:
+                return True
+                
+        return False
+
     def save_tokens(self, new_accounts):
         filename = "tokens.json"
         try:
@@ -111,8 +141,16 @@ class DDAI:
                     self.log(f"{Fore.YELLOW + Style.BRIGHT}⚠️ Could not read tokens.json: {e}, creating new file{Style.RESET_ALL}")
                     existing_accounts = []
 
-            # Merge existing and new accounts
-            account_dict = {acc["Email"]: acc for acc in existing_accounts}
+            # Filter out template/placeholder accounts from existing accounts
+            real_existing_accounts = [acc for acc in existing_accounts if not self.is_template_account(acc)]
+            
+            # Log if we removed template accounts
+            removed_count = len(existing_accounts) - len(real_existing_accounts)
+            if removed_count > 0:
+                self.log(f"{Fore.YELLOW + Style.BRIGHT}🧹 Removed {removed_count} template account(s) from tokens.json{Style.RESET_ALL}")
+
+            # Merge real existing accounts with new accounts
+            account_dict = {acc["Email"]: acc for acc in real_existing_accounts}
 
             for new_acc in new_accounts:
                 account_dict[new_acc["Email"]] = new_acc
@@ -123,7 +161,8 @@ class DDAI:
             with open(filename, 'w') as file:
                 json.dump(updated_accounts, file, indent=4)
                 
-            self.log(f"{Fore.GREEN + Style.BRIGHT}💾 Successfully saved {len(new_accounts)} token(s) to {filename}{Style.RESET_ALL}")
+            total_accounts = len(updated_accounts)
+            self.log(f"{Fore.GREEN + Style.BRIGHT}💾 Successfully saved {len(new_accounts)} new token(s) to {filename} (Total: {total_accounts}){Style.RESET_ALL}")
             return True
 
         except Exception as e:
