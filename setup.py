@@ -2,7 +2,7 @@ from curl_cffi import requests
 from fake_useragent import FakeUserAgent
 from datetime import datetime
 from colorama import *
-import asyncio, json, os, pytz, logging
+import asyncio, json, os, pytz, logging, random
 
 wib = pytz.timezone('Asia/Jakarta')
 
@@ -58,7 +58,8 @@ class DDAI:
 ║                                                                  ║
 ║  {Fore.MAGENTA + Style.BRIGHT}⚡ Features:{Fore.CYAN + Style.BRIGHT}                                                ║
 ║    {Fore.WHITE + Style.BRIGHT}🔐 CloudFlare Captcha Solver (2captcha){Fore.CYAN + Style.BRIGHT}                   ║
-║    {Fore.WHITE + Style.BRIGHT}⚡ Parallel Processing (3x faster){Fore.CYAN + Style.BRIGHT}                        ║
+║    {Fore.WHITE + Style.BRIGHT}🚀 Parallel Processing (UP TO 15x faster!){Fore.CYAN + Style.BRIGHT}                ║
+║    {Fore.WHITE + Style.BRIGHT}⏱️ Smart Random Delays (0.1-0.8s){Fore.CYAN + Style.BRIGHT}                        ║
 ║    {Fore.WHITE + Style.BRIGHT}🌐 Multi-Proxy Support{Fore.CYAN + Style.BRIGHT}                                    ║
 ║    {Fore.WHITE + Style.BRIGHT}🛡️ Smart Error Recovery{Fore.CYAN + Style.BRIGHT}                                   ║
 ║    {Fore.WHITE + Style.BRIGHT}💾 Auto Token Management{Fore.CYAN + Style.BRIGHT}                                  ║
@@ -222,8 +223,8 @@ class DDAI:
         while True:
             try:
                 print(f"\n{Fore.WHITE + Style.BRIGHT}Processing Mode:{Style.RESET_ALL}")
-                print(f"{Fore.WHITE + Style.BRIGHT}1. Sequential (Original - Most Reliable){Style.RESET_ALL}")
-                print(f"{Fore.WHITE + Style.BRIGHT}2. Parallel (Faster but may have captcha issues){Style.RESET_ALL}")
+                print(f"{Fore.WHITE + Style.BRIGHT}1. Sequential (Original - Most Reliable, 1 at a time){Style.RESET_ALL}")
+                print(f"{Fore.WHITE + Style.BRIGHT}2. Parallel (🚀 UP TO 15x FASTER! Random delays 0.1-0.8s){Style.RESET_ALL}")
                 choose = int(input(f"{Fore.BLUE + Style.BRIGHT}Choose [1/2] -> {Style.RESET_ALL}").strip())
 
                 if choose in [1, 2]:
@@ -243,6 +244,10 @@ class DDAI:
             
         for attempt in range(retries):
             try:
+                # Add random delay before each captcha attempt (0.1-0.8 seconds)
+                delay = random.uniform(0.1, 0.8)
+                await asyncio.sleep(delay)
+                
                 self.log(f"{Fore.MAGENTA + Style.BRIGHT}🔐 Solving captcha for {self.mask_account(email)} (attempt {attempt + 1}/{retries}){Style.RESET_ALL}")
                 
                 # Submit captcha to 2captcha
@@ -264,8 +269,9 @@ class DDAI:
                 )
 
                 # Poll for result
-                for poll_attempt in range(30):  # 30 attempts, 5 sec each = 2.5 min max
-                    await asyncio.sleep(5)
+                for poll_attempt in range(30):  # 30 attempts, 4-6 sec each = 2-3 min max
+                    poll_delay = random.uniform(4.0, 6.0)  # Random 4-6 second delay for polling
+                    await asyncio.sleep(poll_delay)
                     
                     res_url = f"http://2captcha.com/res.php?key={self.CAPTCHA_KEY}&action=get&id={request_id}"
                     res_response = await asyncio.to_thread(requests.get, url=res_url, proxy=proxy, timeout=60, impersonate="chrome110", verify=False)
@@ -326,6 +332,10 @@ class DDAI:
         
         for attempt in range(retries):
             try:
+                # Add random delay before each login attempt (0.2-0.8 seconds)
+                login_delay = random.uniform(0.2, 0.8)
+                await asyncio.sleep(login_delay)
+                
                 response = await asyncio.to_thread(
                     requests.post, 
                     url=url, 
@@ -374,6 +384,10 @@ class DDAI:
         )
 
         self.log(f"{Fore.CYAN + Style.BRIGHT}Captcha:{Style.RESET_ALL}")
+
+        # Add initial random delay before starting captcha process (0.1-0.8s)
+        initial_delay = random.uniform(0.1, 0.8)
+        await asyncio.sleep(initial_delay)
 
         # Use the WORKING captcha solver
         cf_solved = await self.solve_cf_turnstile(email, proxy)
@@ -427,19 +441,20 @@ class DDAI:
             # Use the original process_accounts logic
             await self.process_accounts(email, use_proxy)
             
-            # Add delay between accounts (but smaller than original since we're parallel)
-            await asyncio.sleep(1)
+            # Add random delay between accounts (0.1-0.5 seconds for better distribution)
+            final_delay = random.uniform(0.1, 0.5)
+            await asyncio.sleep(final_delay)
             
             return True
 
     async def setup_tokens_parallel(self, accounts, use_proxy):
         """Setup tokens for accounts in parallel"""
         # Create semaphore to limit concurrent requests (avoid overwhelming the service)
-        max_concurrent = min(3, len(accounts))  # Max 3 concurrent requests
+        max_concurrent = min(15, len(accounts))  # Max 15 concurrent requests for better speed
         semaphore = asyncio.Semaphore(max_concurrent)
         
         self.log(
-            f"{Fore.GREEN + Style.BRIGHT}Processing {len(accounts)} accounts in parallel with {max_concurrent} concurrent workers{Style.RESET_ALL}"
+            f"{Fore.GREEN + Style.BRIGHT}🚀 Processing {len(accounts)} accounts in parallel with {max_concurrent} concurrent workers{Style.RESET_ALL}"
         )
         
         # Create tasks for all accounts
@@ -451,9 +466,9 @@ class DDAI:
                 )
                 tasks.append(task)
                 
-                # Add longer delay between task creation for captcha stability
+                # Shorter delay between task creation since we have random delays in each process
                 if idx < len(accounts):
-                    await asyncio.sleep(3)
+                    await asyncio.sleep(random.uniform(0.1, 0.3))  # Random 0.1-0.3s delay
         
         self.log(f"{Fore.BLUE + Style.BRIGHT}Waiting for all {len(tasks)} setup tasks to complete...{Style.RESET_ALL}")
         
