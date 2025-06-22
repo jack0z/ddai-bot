@@ -1,11 +1,26 @@
+# Core HTTP and Web Scraping
 curl-cffi==0.7.2
 fake-useragent==1.5.1
-colorama==0.4.6
-asyncio
-pytz==2024.2
-requests==2.32.3
 cloudscraper==1.2.71
+requests==2.32.3
+
+# Database and Data Storage
 pymongo==4.10.1
+
+# Environment and Configuration
 python-dotenv==1.0.1
+
+# Date and Time
+pytz==2024.2
+
+# Task Scheduling
 schedule==1.2.2
-logging
+
+# Terminal Colors and UI
+colorama==0.4.6
+
+# Optional: For better async performance
+aiohttp==3.9.1
+
+# Optional: For enhanced error handling
+tenacity==8.2.3
