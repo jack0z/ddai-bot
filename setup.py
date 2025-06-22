@@ -94,12 +94,23 @@ class DDAI:
     def save_tokens(self, new_accounts):
         filename = "tokens.json"
         try:
+            existing_accounts = []
+            
+            # Try to load existing tokens, but handle invalid JSON gracefully
             if os.path.exists(filename) and os.path.getsize(filename) > 0:
-                with open(filename, 'r') as file:
-                    existing_accounts = json.load(file)
-            else:
-                existing_accounts = []
+                try:
+                    with open(filename, 'r') as file:
+                        existing_accounts = json.load(file)
+                        if not isinstance(existing_accounts, list):
+                            existing_accounts = []
+                except json.JSONDecodeError:
+                    self.log(f"{Fore.YELLOW + Style.BRIGHT}⚠️ tokens.json contains invalid JSON, creating new file{Style.RESET_ALL}")
+                    existing_accounts = []
+                except Exception as e:
+                    self.log(f"{Fore.YELLOW + Style.BRIGHT}⚠️ Could not read tokens.json: {e}, creating new file{Style.RESET_ALL}")
+                    existing_accounts = []
 
+            # Merge existing and new accounts
             account_dict = {acc["Email"]: acc for acc in existing_accounts}
 
             for new_acc in new_accounts:
@@ -107,11 +118,16 @@ class DDAI:
 
             updated_accounts = list(account_dict.values())
 
+            # Save to file
             with open(filename, 'w') as file:
                 json.dump(updated_accounts, file, indent=4)
+                
+            self.log(f"{Fore.GREEN + Style.BRIGHT}💾 Successfully saved {len(new_accounts)} token(s) to {filename}{Style.RESET_ALL}")
+            return True
 
         except Exception as e:
-            return []
+            self.log(f"{Fore.RED + Style.BRIGHT}❌ Failed to save tokens: {e}{Style.RESET_ALL}")
+            return False
         
     def load_2captcha_key(self):
         try:
@@ -367,12 +383,18 @@ class DDAI:
         # Use the WORKING login method
         access_token, refresh_token = await self.auth_login(email, proxy)
         if access_token and refresh_token:
-            self.save_tokens([{"Email":email, "accessToken":access_token, "refreshToken":refresh_token}])
-
-            self.log(
-                f"{Fore.CYAN + Style.BRIGHT}Status :{Style.RESET_ALL}"
-                f"{Fore.GREEN + Style.BRIGHT} Token Have Been Saved Successfully {Style.RESET_ALL}"
-            )
+            save_success = self.save_tokens([{"Email":email, "accessToken":access_token, "refreshToken":refresh_token}])
+            
+            if save_success:
+                self.log(
+                    f"{Fore.CYAN + Style.BRIGHT}Status :{Style.RESET_ALL}"
+                    f"{Fore.GREEN + Style.BRIGHT} ✅ Token Have Been Saved Successfully {Style.RESET_ALL}"
+                )
+            else:
+                self.log(
+                    f"{Fore.CYAN + Style.BRIGHT}Status :{Style.RESET_ALL}"
+                    f"{Fore.RED + Style.BRIGHT} ❌ Failed To Save Token {Style.RESET_ALL}"
+                )
 
     async def process_single_account(self, account, use_proxy, idx, total_accounts, semaphore):
         """Process a single account with semaphore for rate limiting"""
