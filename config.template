@@ -1,0 +1,37 @@
+# DDAI Bot Configuration Template
+# Copy this file to '.env' and fill in your MongoDB details
+
+# MongoDB Configuration for Point Logging (Optional)
+# ================================================
+
+# If you want to enable point logging to MongoDB, uncomment and fill in the connection string below:
+
+# For MongoDB Atlas (Cloud - Recommended):
+# MONGODB_URI=mongodb+srv://your_username:your_password@your_cluster.mongodb.net/
+
+# For local MongoDB installation:
+# MONGODB_URI=mongodb://localhost:27017/
+
+# For MongoDB with authentication:
+# MONGODB_URI=mongodb://username:password@host:port/database
+
+# SETUP INSTRUCTIONS:
+# ===================
+# 1. Copy this file and rename it to '.env'
+# 2. Uncomment the MONGODB_URI line that matches your setup
+# 3. Replace the placeholder values with your actual MongoDB connection details
+# 4. Save the file
+# 5. The bot will automatically detect and use the MongoDB connection
+
+# MONGODB ATLAS SETUP (Free Tier):
+# ================================
+# 1. Go to https://www.mongodb.com/atlas
+# 2. Create a free account
+# 3. Create a new cluster (choose free tier)
+# 4. Create a database user
+# 5. Whitelist your IP address (or use 0.0.0.0/0 for all IPs)
+# 6. Get the connection string from "Connect" -> "Connect your application"
+# 7. Replace <password> with your database user password
+# 8. Paste the connection string as the MONGODB_URI value
+
+# NOTE: If you don't configure MongoDB, the bot will still work normally but won't log points to database 

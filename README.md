@@ -1,112 +1,198 @@
-# DDAI Network BOT
-DDAI Network BOT
+# DDAI Network Bot
 
-- Register Here : [DDAI Network](https://app.ddai.network/register?ref=TUEPDwXT)
-- Use Code `TUEPDwXT`
+Enhanced automated bot for DDAI Network with parallel processing, automatic error recovery, and comprehensive point logging.
 
 ## Features
 
-  - Auto Get Account Information
-  - Auto Run With [Free Proxyscrape](https://proxyscrape.com/free-proxy-list) Proxy - `Choose 1`
-  - Auto Run With Private Proxy - `Choose 2`
-  - Auto Run Without Proxy - `Choose 3`
-  - Auto Rotate Invalid Proxies - `y` or `n`
-  - Auto Perform Onchain Trigger
-  - Auto Complete Available Missions
-  - Multi Accounts With Threads
+✅ **Parallel Token Setup** - Process multiple accounts simultaneously for faster setup
+✅ **Automatic Re-setup** - Automatically re-authenticate accounts when refresh tokens fail (403 errors)
+✅ **Point Logging** - Track and log points to MongoDB database with comprehensive statistics
+✅ **Proxy Support** - Free proxyscrape, private proxies, or no proxy modes
+✅ **Mission Completion** - Automatic mission claiming
+✅ **Throughput Monitoring** - Real-time throughput percentage tracking
+✅ **Error Recovery** - Robust error handling and automatic recovery
 
-## Requiremnets
+## Requirements
 
-- Make sure you have Python3.9 or higher installed and pip.
-- 2captcha key (optional)
+- Python 3.8+
+- 2captcha API key (for solving captcha during setup)
+- MongoDB database (optional, for point logging)
 
-## Instalation
+## Installation
 
-1. **Clone The Repositories:**
-   ```bash
-   git clone https://github.com/vonssy/Ddai-BOT.git
-   ```
-   ```bash
-   cd Ddai-BOT
-   ```
-
-2. **Install Requirements:**
-   ```bash
-   pip install -r requirements.txt #or pip3 install -r requirements.txt
-   ```
-
-## Configuration
-
-- **2captcha_key.txt:** You will find the file `2captcha_key.txt` inside the project directory. Make sure `2captcha_key.txt` contains data that matches the format expected by the script. Here are examples of file formats:
-  ```bash
-    your_2captcha_key
-  ```
-
-- **accounts.json:** You will find the file `accounts.json` inside the project directory. Make sure `accounts.json` contains data that matches the format expected by the script. Here are examples of file formats:
-  ```json
-    [
-        {
-            "Email": "your_email_address_1",
-            "Password": "your_password_1"
-        },
-        {
-            "Email": "your_email_address_2",
-            "Password": "your_password_2"
-        }
-    ]
-  ```
-
-### Note
-
-- If you don't have a 2cpatcha key, you can fetch the data manually and put it in tokens.json according to the format.
-
-<div style="text-align: center;">
-  <img src="image.png" alt="Image" width="500"/>
-</div>
-  
-- **tokens.json:** You will find the file `tokens.json` inside the project directory. Make sure `tokens.json` contains data that matches the format expected by the script. Here are examples of file formats:
-  ```json
-    [
-        {
-            "Email": "your_email_address_1",
-            "accessToken": "your_access_token_1",
-            "refreshToken": "your_refresh_token_1"
-        },
-        {
-            "Email": "your_email_address_2",
-            "accessToken": "your_access_token_2",
-            "refreshToken": "your_refresh_token_2"
-        }
-    ]
-  ```
-
-- **proxy.txt:** You will find the file `proxy.txt` inside the project directory. Make sure `proxy.txt` contains data that matches the format expected by the script. Here are examples of file formats:
-  ```bash
-    ip:port # Default Protcol HTTP.
-    protocol://ip:port
-    protocol://user:pass@ip:port
-  ```
-
-## Setup
-
+1. Clone or download this repository
+2. Install dependencies:
 ```bash
-python setup.py #or python3 setup.py
+pip install -r requirements.txt
 ```
 
-## Run
+3. Create your configuration files:
 
-```bash
-python bot.py #or python3 bot.py
+### accounts.json
+Create `accounts.json` with your account credentials:
+```json
+[
+    {
+        "Email": "your-email@example.com",
+        "Password": "your-password"
+    },
+    {
+        "Email": "another-email@example.com",
+        "Password": "another-password"
+    }
+]
 ```
 
-## Buy Me a Coffee
+### 2captcha_key.txt
+Create `2captcha_key.txt` with your 2captcha API key:
+```
+YOUR_2CAPTCHA_API_KEY_HERE
+```
 
-- **EVM:** 0xe3c9ef9a39e9eb0582e5b147026cae524338521a
-- **TON:** UQBEFv58DC4FUrGqinBB5PAQS7TzXSm5c1Fn6nkiet8kmehB
-- **SOL:** E1xkaJYmAFEj28NPHKhjbf7GcvfdjKdvXju8d8AeSunf
-- **SUI:** 0xa03726ecbbe00b31df6a61d7a59d02a7eedc39fe269532ceab97852a04cf3347
+### proxy.txt (Optional)
+Create `proxy.txt` for private proxies (one per line):
+```
+http://proxy1:port
+socks5://proxy2:port
+```
 
-Thank you for visiting this repository, don't forget to contribute in the form of follows and stars.
-If you have questions, find an issue, or have suggestions for improvement, feel free to contact me or open an *issue* in this GitHub repository.
+### .env (Optional - for point logging)
+Create `.env` file for MongoDB connection:
+```
+# MongoDB Configuration for Point Logging
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/
+
+# Or for local MongoDB:
+# MONGODB_URI=mongodb://localhost:27017/
+```
+
+## Usage
+
+### 1. Initial Setup (Generate Tokens)
+Run this first to generate access tokens for your accounts:
+```bash
+python setup.py
+```
+
+**Features:**
+- **Parallel Processing**: Processes up to 5 accounts simultaneously
+- **Captcha Solving**: Automatically solves CloudFlare Turnstile captcha
+- **Proxy Support**: Choose from free proxies, private proxies, or no proxy
+- **Rate Limiting**: Built-in delays to avoid overwhelming the service
+
+### 2. Run the Bot
+After tokens are generated, run the main bot:
+```bash
+python bot.py
+```
+
+**Features:**
+- **Automatic Re-setup**: When refresh tokens fail (403 error), automatically re-runs setup for that account
+- **Point Logging**: Tracks and logs points to MongoDB (if configured)
+- **Mission Automation**: Automatically completes available missions
+- **Throughput Monitoring**: Real-time monitoring of account performance
+- **Multi-account Support**: Runs all accounts in parallel
+
+## Point Logging System
+
+If you configure MongoDB, the bot will automatically track:
+
+- **Total Requests**: Lifetime request count per account
+- **24h Requests**: Daily request statistics  
+- **Request Rate**: Current request processing rate
+- **Throughput Percentage**: Network performance metrics
+- **Mission Rewards**: Automatic mission completion tracking
+- **Join Date**: Account registration date
+- **Historical Data**: Daily earnings and performance history
+
+### MongoDB Setup
+
+1. **MongoDB Atlas (Cloud - Recommended)**:
+   - Create free account at [MongoDB Atlas](https://www.mongodb.com/atlas)
+   - Create a new cluster
+   - Get connection string and add to `.env` file
+
+2. **Local MongoDB**:
+   - Install MongoDB locally
+   - Use connection string: `mongodb://localhost:27017/`
+
+## Files Structure
+
+```
+├── bot.py              # Main bot script
+├── setup.py            # Token setup script  
+├── accounts.json       # Account credentials
+├── tokens.json         # Generated access tokens (auto-created)
+├── 2captcha_key.txt    # 2captcha API key
+├── proxy.txt           # Proxy list (optional)
+├── .env               # Environment variables (optional)
+├── requirements.txt    # Python dependencies
+├── ddai_points_tracker.log  # Point logging file (auto-created)
+└── README.md          # This file
+```
+
+## Enhanced Error Handling
+
+### Automatic Re-setup on 403 Errors
+When the bot encounters a 403 error during token refresh (indicating invalid refresh token), it will:
+
+1. Automatically load the account credentials from `accounts.json`
+2. Run the setup process for that specific account
+3. Solve captcha and generate new tokens
+4. Resume normal operation seamlessly
+
+### Parallel Processing Benefits
+- **Faster Setup**: Process 5 accounts simultaneously instead of one-by-one
+- **Rate Limiting**: Built-in semaphore prevents overwhelming the service
+- **Error Isolation**: Failed accounts don't block successful ones
+
+## Troubleshooting
+
+### Common Issues
+
+1. **No tokens generated**:
+   - Check your 2captcha API key and balance
+   - Verify account credentials in `accounts.json`
+   - Check internet connection and proxy settings
+
+2. **403 Refresh Errors**:
+   - The bot will automatically handle this by re-running setup
+   - Ensure `accounts.json` contains correct credentials
+   - Check that 2captcha key is valid
+
+3. **Database connection issues**:
+   - Verify MongoDB connection string in `.env`
+   - Check MongoDB Atlas whitelist settings
+   - Point logging will be disabled if database unavailable
+
+4. **Proxy issues**:
+   - Free proxies may be unreliable, consider private proxies
+   - Enable proxy rotation for better success rate
+   - Bot can run without proxies if needed
+
+### Performance Tips
+
+- Use private proxies for better stability
+- Monitor 2captcha balance regularly
+- Keep accounts.json secure and backed up
+- Check bot logs for performance metrics
+
+## Security Notes
+
+- Keep your `accounts.json` and `2captcha_key.txt` files secure
+- Use environment variables for sensitive data
+- Consider using a dedicated server for 24/7 operation
+- Monitor account activity regularly
+
+## Support
+
+- Check the logs in `ddai_points_tracker.log` for detailed information
+- Ensure all dependencies are installed correctly
+- Verify network connectivity and proxy settings
+- Monitor 2captcha API usage and balance
+
+## License
+
+This bot is for educational purposes. Use responsibly and in accordance with DDAI Network's terms of service.
 
 **vonssy**

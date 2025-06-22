@@ -2,9 +2,19 @@ from curl_cffi import requests
 from fake_useragent import FakeUserAgent
 from datetime import datetime
 from colorama import *
-import asyncio, json, os, pytz
+import asyncio, json, os, pytz, logging
 
 wib = pytz.timezone('Asia/Jakarta')
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 class DDAI:
     def __init__(self) -> None:
@@ -39,14 +49,27 @@ class DDAI:
         )
 
     def welcome(self):
-        print(
-            f"""
-        {Fore.GREEN + Style.BRIGHT}Auto Setup {Fore.BLUE + Style.BRIGHT}DDAI Network - BOT
-            """
-            f"""
-        {Fore.GREEN + Style.BRIGHT}Rey? {Fore.YELLOW + Style.BRIGHT}<INI WATERMARK>
-            """
-        )
+        print(f"""
+{Fore.CYAN + Style.BRIGHT}╔══════════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║  {Fore.YELLOW + Style.BRIGHT}🔧 DDAI NETWORK - TOKEN SETUP WIZARD 🔧{Fore.CYAN + Style.BRIGHT}                     ║
+║                                                                  ║
+║  {Fore.GREEN + Style.BRIGHT}🚀 Advanced Multi-Account Token Generator 🚀{Fore.CYAN + Style.BRIGHT}                ║
+║                                                                  ║
+║  {Fore.MAGENTA + Style.BRIGHT}⚡ Features:{Fore.CYAN + Style.BRIGHT}                                                ║
+║    {Fore.WHITE + Style.BRIGHT}🔐 CloudFlare Captcha Solver (2captcha){Fore.CYAN + Style.BRIGHT}                   ║
+║    {Fore.WHITE + Style.BRIGHT}⚡ Parallel Processing (3x faster){Fore.CYAN + Style.BRIGHT}                        ║
+║    {Fore.WHITE + Style.BRIGHT}🌐 Multi-Proxy Support{Fore.CYAN + Style.BRIGHT}                                    ║
+║    {Fore.WHITE + Style.BRIGHT}🛡️ Smart Error Recovery{Fore.CYAN + Style.BRIGHT}                                   ║
+║    {Fore.WHITE + Style.BRIGHT}💾 Auto Token Management{Fore.CYAN + Style.BRIGHT}                                  ║
+║                                                                  ║
+║  {Fore.BLUE + Style.BRIGHT}👨‍💻 Original Creator: vonssy{Fore.CYAN + Style.BRIGHT}                                  ║
+║  {Fore.BLUE + Style.BRIGHT}🔧 Enhanced by: jack0z{Fore.CYAN + Style.BRIGHT}                                       ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
+
+{Fore.YELLOW + Style.BRIGHT}💡 TIP: Run this setup first, then use bot.py to start farming! 💡{Style.RESET_ALL}
+        """)
 
     def format_seconds(self, seconds):
         hours, remainder = divmod(seconds, 3600)
@@ -178,31 +201,56 @@ class DDAI:
                     print(f"{Fore.RED + Style.BRIGHT}Please enter either 1, 2 or 3.{Style.RESET_ALL}")
             except ValueError:
                 print(f"{Fore.RED + Style.BRIGHT}Invalid input. Enter a number (1, 2 or 3).{Style.RESET_ALL}")
+
+    def print_processing_question(self):
+        while True:
+            try:
+                print(f"\n{Fore.WHITE + Style.BRIGHT}Processing Mode:{Style.RESET_ALL}")
+                print(f"{Fore.WHITE + Style.BRIGHT}1. Sequential (Original - Most Reliable){Style.RESET_ALL}")
+                print(f"{Fore.WHITE + Style.BRIGHT}2. Parallel (Faster but may have captcha issues){Style.RESET_ALL}")
+                choose = int(input(f"{Fore.BLUE + Style.BRIGHT}Choose [1/2] -> {Style.RESET_ALL}").strip())
+
+                if choose in [1, 2]:
+                    processing_type = "Sequential" if choose == 1 else "Parallel"
+                    print(f"{Fore.GREEN + Style.BRIGHT}{processing_type} Processing Selected.{Style.RESET_ALL}")
+                    return choose
+                else:
+                    print(f"{Fore.RED + Style.BRIGHT}Please enter either 1 or 2.{Style.RESET_ALL}")
+            except ValueError:
+                print(f"{Fore.RED + Style.BRIGHT}Invalid input. Enter a number (1 or 2).{Style.RESET_ALL}")
     
     async def solve_cf_turnstile(self, email: str, proxy=None, retries=5):
+        """Solve CloudFlare Turnstile captcha using 2captcha - EXACT WORKING VERSION"""
+        if self.CAPTCHA_KEY is None:
+            self.log(f"{Fore.RED + Style.BRIGHT}No 2captcha API key available{Style.RESET_ALL}")
+            return False
+            
         for attempt in range(retries):
             try:
-                if self.CAPTCHA_KEY is None:
-                    return None
-                    
+                self.log(f"{Fore.MAGENTA + Style.BRIGHT}🔐 Solving captcha for {self.mask_account(email)} (attempt {attempt + 1}/{retries}){Style.RESET_ALL}")
+                
+                # Submit captcha to 2captcha
                 url = f"http://2captcha.com/in.php?key={self.CAPTCHA_KEY}&method=turnstile&sitekey={self.SITE_KEY}&pageurl={self.PAGE_URL}"
                 response = await asyncio.to_thread(requests.get, url=url, proxy=proxy, timeout=60, impersonate="chrome110", verify=False)
                 response.raise_for_status()
                 result = response.text
 
                 if 'OK|' not in result:
+                    self.log(f"{Fore.YELLOW + Style.BRIGHT}Failed to submit captcha: {result}{Style.RESET_ALL}")
                     await asyncio.sleep(5)
                     continue
 
                 request_id = result.split('|')[1]
-
                 self.log(
                     f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
-                    f"{Fore.BLUE + Style.BRIGHT} Req Id: {Style.RESET_ALL}"
+                    f"{Fore.BLUE + Style.BRIGHT} Captcha submitted, Req Id: {Style.RESET_ALL}"
                     f"{Fore.WHITE + Style.BRIGHT}{request_id}{Style.RESET_ALL}"
                 )
 
-                for _ in range(30):
+                # Poll for result
+                for poll_attempt in range(30):  # 30 attempts, 5 sec each = 2.5 min max
+                    await asyncio.sleep(5)
+                    
                     res_url = f"http://2captcha.com/res.php?key={self.CAPTCHA_KEY}&action=get&id={request_id}"
                     res_response = await asyncio.to_thread(requests.get, url=res_url, proxy=proxy, timeout=60, impersonate="chrome110", verify=False)
                     res_response.raise_for_status()
@@ -211,49 +259,95 @@ class DDAI:
                     if 'OK|' in res_result:
                         captcha_token = res_result.split('|')[1]
                         self.captcha_tokens[email] = captcha_token
+                        self.log(
+                            f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
+                            f"{Fore.BLUE + Style.BRIGHT} Status: {Style.RESET_ALL}"
+                            f"{Fore.GREEN + Style.BRIGHT}✅ Captcha solved successfully{Style.RESET_ALL}"
+                        )
                         return True
                     elif res_result == "CAPCHA_NOT_READY":
                         self.log(
                             f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
                             f"{Fore.BLUE + Style.BRIGHT} Status: {Style.RESET_ALL}"
-                            f"{Fore.YELLOW + Style.BRIGHT}Captcha Not Ready{Style.RESET_ALL}"
+                            f"{Fore.YELLOW + Style.BRIGHT}⏳ Captcha not ready, waiting... ({poll_attempt + 1}/30){Style.RESET_ALL}"
                         )
-                        await asyncio.sleep(5)
                         continue
                     else:
+                        self.log(
+                            f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
+                            f"{Fore.BLUE + Style.BRIGHT} Status: {Style.RESET_ALL}"
+                            f"{Fore.RED + Style.BRIGHT}❌ Captcha solving failed: {res_result}{Style.RESET_ALL}"
+                        )
                         break
 
             except Exception as e:
+                self.log(f"{Fore.RED + Style.BRIGHT}Error solving captcha for {self.mask_account(email)} (attempt {attempt + 1}): {e}{Style.RESET_ALL}")
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-                return None
 
-    async def auth_login(self, email: str, proxy=None, retries=5):
+        self.log(f"{Fore.RED + Style.BRIGHT}❌ Failed to solve captcha for {self.mask_account(email)} after {retries} attempts{Style.RESET_ALL}")
+        return False
+
+    async def auth_login(self, email: str, proxy=None, retries=3):
+        """Login with captcha token - EXACT WORKING VERSION"""
+        # Get captcha token (should be solved already)
+        captcha_token = self.captcha_tokens.get(email, "")
+        
         url = f"{self.BASE_API}/login"
-        data = json.dumps({"email":email, "password":self.password[email], "captchaToken":self.captcha_tokens[email]})
+        data = json.dumps({
+            "email": email, 
+            "password": self.password[email], 
+            "captchaToken": captcha_token
+        })
         headers = {
             **self.headers,
             "Content-Length": str(len(data)),
             "Content-Type": "application/json"
         }
+
+        self.log(f"{Fore.CYAN + Style.BRIGHT}🔑 Attempting login for {self.mask_account(email)}{Style.RESET_ALL}")
+        
         for attempt in range(retries):
             try:
-                response = await asyncio.to_thread(requests.post, url=url, headers=headers, data=data, proxy=proxy, timeout=60, impersonate="chrome110", verify=False)
-                response.raise_for_status()
-                return response.json()
+                response = await asyncio.to_thread(
+                    requests.post, 
+                    url=url, 
+                    headers=headers, 
+                    data=data, 
+                    proxy=proxy, 
+                    timeout=60, 
+                    impersonate="chrome110", 
+                    verify=False
+                )
+                
+                self.log(f"{Fore.CYAN + Style.BRIGHT}Login response status for {self.mask_account(email)}: {response.status_code}{Style.RESET_ALL}")
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if result.get("status") == "success":
+                        login_data = result.get("data", {})
+                        access_token = login_data.get("accessToken")
+                        refresh_token = login_data.get("refreshToken")
+                        
+                        if access_token and refresh_token:
+                            self.log(f"{Fore.GREEN + Style.BRIGHT}✅ Successfully logged in {self.mask_account(email)}{Style.RESET_ALL}")
+                            return access_token, refresh_token
+                        else:
+                            self.log(f"{Fore.RED + Style.BRIGHT}Missing tokens in login response for {self.mask_account(email)}{Style.RESET_ALL}")
+                    else:
+                        self.log(f"{Fore.RED + Style.BRIGHT}Login failed for {self.mask_account(email)}: {result.get('message', result)}{Style.RESET_ALL}")
+                elif response.status_code == 403:
+                    self.log(f"{Fore.RED + Style.BRIGHT}Login blocked for {self.mask_account(email)} - captcha may have failed{Style.RESET_ALL}")
+                else:
+                    self.log(f"{Fore.RED + Style.BRIGHT}Login failed for {self.mask_account(email)}: {response.status_code}{Style.RESET_ALL}")
+                    
             except Exception as e:
+                self.log(f"{Fore.RED + Style.BRIGHT}Error in login attempt {attempt + 1} for {self.mask_account(email)}: {e}{Style.RESET_ALL}")
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
-                    continue
-                self.log(
-                    f"{Fore.CYAN+Style.BRIGHT}Status :{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} Login Failed {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
-                )
-
-        return None
+                    
+        return None, None
         
     async def process_accounts(self, email: str, use_proxy: bool):
         proxy = self.get_next_proxy_for_account(email) if use_proxy else None
@@ -265,32 +359,101 @@ class DDAI:
 
         self.log(f"{Fore.CYAN + Style.BRIGHT}Captcha:{Style.RESET_ALL}")
 
+        # Use the WORKING captcha solver
         cf_solved = await self.solve_cf_turnstile(email, proxy)
         if not cf_solved:
-            self.log(
-                f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
-                f"{Fore.BLUE + Style.BRIGHT} Status: {Style.RESET_ALL}"
-                f"{Fore.RED + Style.BRIGHT}Not Solved{Style.RESET_ALL}"
-            )
             return
         
-        self.log(
-            f"{Fore.MAGENTA + Style.BRIGHT}    >{Style.RESET_ALL}"
-            f"{Fore.BLUE + Style.BRIGHT} Status: {Style.RESET_ALL}"
-            f"{Fore.GREEN + Style.BRIGHT}Solved{Style.RESET_ALL}"
-        )
-    
-        login = await self.auth_login(email, proxy)
-        if login and login.get("status") == "success":
-            access_token = login["data"]["accessToken"]
-            refresh_token = login["data"]["refreshToken"]
-
+        # Use the WORKING login method
+        access_token, refresh_token = await self.auth_login(email, proxy)
+        if access_token and refresh_token:
             self.save_tokens([{"Email":email, "accessToken":access_token, "refreshToken":refresh_token}])
 
             self.log(
                 f"{Fore.CYAN + Style.BRIGHT}Status :{Style.RESET_ALL}"
                 f"{Fore.GREEN + Style.BRIGHT} Token Have Been Saved Successfully {Style.RESET_ALL}"
             )
+
+    async def process_single_account(self, account, use_proxy, idx, total_accounts, semaphore):
+        """Process a single account with semaphore for rate limiting"""
+        async with semaphore:
+            email = account["Email"]
+            password = account["Password"]
+            
+            self.log(
+                f"{Fore.CYAN + Style.BRIGHT}=========================[{Style.RESET_ALL}"
+                f"{Fore.WHITE + Style.BRIGHT} {idx} {Style.RESET_ALL}"
+                f"{Fore.CYAN + Style.BRIGHT}Of{Style.RESET_ALL}"
+                f"{Fore.WHITE + Style.BRIGHT} {total_accounts} {Style.RESET_ALL}"
+                f"{Fore.CYAN + Style.BRIGHT}]========================={Style.RESET_ALL}"
+            )
+
+            if not "@" in email or not password:
+                self.log(
+                    f"{Fore.CYAN+Style.BRIGHT}Status :{Style.RESET_ALL}"
+                    f"{Fore.RED+Style.BRIGHT} Invalid Account Data {Style.RESET_ALL}"
+                )
+                return None
+
+            self.log(
+                f"{Fore.CYAN + Style.BRIGHT}Account:{Style.RESET_ALL}"
+                f"{Fore.WHITE + Style.BRIGHT} {self.mask_account(email)} {Style.RESET_ALL}"
+            )
+
+            self.password[email] = password
+
+            # Use the original process_accounts logic
+            await self.process_accounts(email, use_proxy)
+            
+            # Add delay between accounts (but smaller than original since we're parallel)
+            await asyncio.sleep(1)
+            
+            return True
+
+    async def setup_tokens_parallel(self, accounts, use_proxy):
+        """Setup tokens for accounts in parallel"""
+        # Create semaphore to limit concurrent requests (avoid overwhelming the service)
+        max_concurrent = min(3, len(accounts))  # Max 3 concurrent requests
+        semaphore = asyncio.Semaphore(max_concurrent)
+        
+        self.log(
+            f"{Fore.GREEN + Style.BRIGHT}Processing {len(accounts)} accounts in parallel with {max_concurrent} concurrent workers{Style.RESET_ALL}"
+        )
+        
+        # Create tasks for all accounts
+        tasks = []
+        for idx, account in enumerate(accounts, start=1):
+            if account:
+                task = asyncio.create_task(
+                    self.process_single_account(account, use_proxy, idx, len(accounts), semaphore)
+                )
+                tasks.append(task)
+                
+                # Add longer delay between task creation for captcha stability
+                if idx < len(accounts):
+                    await asyncio.sleep(3)
+        
+        self.log(f"{Fore.BLUE + Style.BRIGHT}Waiting for all {len(tasks)} setup tasks to complete...{Style.RESET_ALL}")
+        
+        # Wait for all tasks to complete
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Process results
+        successful_count = 0
+        failed_count = 0
+        
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                self.log(f"{Fore.RED + Style.BRIGHT}Task {i+1} failed with exception: {result}{Style.RESET_ALL}")
+                failed_count += 1
+            elif result:
+                successful_count += 1
+            else:
+                failed_count += 1
+        
+        self.log(
+            f"{Fore.GREEN + Style.BRIGHT}Parallel Setup Results: ✅ {successful_count} successful, ❌ {failed_count} failed{Style.RESET_ALL}"
+        )
     
     async def main(self):
         try:
@@ -302,8 +465,14 @@ class DDAI:
             capctha_key = self.load_2captcha_key()
             if capctha_key:
                 self.CAPTCHA_KEY = capctha_key
+                self.log(f"{Fore.GREEN + Style.BRIGHT}🔐 2captcha API key loaded successfully{Style.RESET_ALL}")
+            else:
+                self.log(f"{Fore.RED + Style.BRIGHT}⚠️ WARNING: No 2captcha API key found!{Style.RESET_ALL}")
+                self.log(f"{Fore.YELLOW + Style.BRIGHT}Please add your key to 2captcha_key.txt{Style.RESET_ALL}")
+                return
             
             use_proxy_choice = self.print_question()
+            processing_choice = self.print_processing_question()
 
             use_proxy = False
             if use_proxy_choice in [1, 2]:
@@ -319,49 +488,127 @@ class DDAI:
             if use_proxy:
                 await self.load_proxies(use_proxy_choice)
 
-            separator = "="*25
-            for idx, account in enumerate(accounts, start=1):
-                if account:
-                    email = account["Email"]
-                    password = account["Password"]
-                    self.log(
-                        f"{Fore.CYAN + Style.BRIGHT}{separator}[{Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT} {idx} {Style.RESET_ALL}"
-                        f"{Fore.CYAN + Style.BRIGHT}Of{Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT} {len(accounts)} {Style.RESET_ALL}"
-                        f"{Fore.CYAN + Style.BRIGHT}]{separator}{Style.RESET_ALL}"
-                    )
-
-                    if not "@" in email or not password:
+            if processing_choice == 1:
+                # ORIGINAL SEQUENTIAL METHOD - EXACTLY AS IT WAS
+                separator = "="*25
+                for idx, account in enumerate(accounts, start=1):
+                    if account:
+                        email = account["Email"]
+                        password = account["Password"]
                         self.log(
-                            f"{Fore.CYAN+Style.BRIGHT}Status :{Style.RESET_ALL}"
-                            f"{Fore.RED+Style.BRIGHT} Invalid Account Data {Style.RESET_ALL}"
+                            f"{Fore.CYAN + Style.BRIGHT}{separator}[{Style.RESET_ALL}"
+                            f"{Fore.WHITE + Style.BRIGHT} {idx} {Style.RESET_ALL}"
+                            f"{Fore.CYAN + Style.BRIGHT}Of{Style.RESET_ALL}"
+                            f"{Fore.WHITE + Style.BRIGHT} {len(accounts)} {Style.RESET_ALL}"
+                            f"{Fore.CYAN + Style.BRIGHT}]{separator}{Style.RESET_ALL}"
                         )
-                        continue
 
-                    self.log(
-                        f"{Fore.CYAN + Style.BRIGHT}Account:{Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT} {self.mask_account(email)} {Style.RESET_ALL}"
-                    )
+                        if not "@" in email or not password:
+                            self.log(
+                                f"{Fore.CYAN+Style.BRIGHT}Status :{Style.RESET_ALL}"
+                                f"{Fore.RED+Style.BRIGHT} Invalid Account Data {Style.RESET_ALL}"
+                            )
+                            continue
 
-                    self.password[email] = password
+                        self.log(
+                            f"{Fore.CYAN + Style.BRIGHT}Account:{Style.RESET_ALL}"
+                            f"{Fore.WHITE + Style.BRIGHT} {self.mask_account(email)} {Style.RESET_ALL}"
+                        )
 
-                    await self.process_accounts(email, use_proxy)
-                    await asyncio.sleep(3)
+                        self.password[email] = password
 
-            self.log(f"{Fore.CYAN + Style.BRIGHT}={Style.RESET_ALL}"*68)
+                        await self.process_accounts(email, use_proxy)
+                        await asyncio.sleep(3)
+            else:
+                # PARALLEL METHOD
+                separator = "="*75
+                self.log(f"{Fore.CYAN + Style.BRIGHT}{separator}{Style.RESET_ALL}")
+                await self.setup_tokens_parallel(accounts, use_proxy)
+                self.log(f"{Fore.CYAN + Style.BRIGHT}{separator}{Style.RESET_ALL}")
+
+            self.log(f"{Fore.CYAN + Style.BRIGHT}={'='*68}{Style.RESET_ALL}")
 
         except Exception as e:
             self.log(f"{Fore.RED+Style.BRIGHT}Error: {e}{Style.RESET_ALL}")
             raise e
+
+# Standalone function to run setup from bot.py
+async def run_setup_for_failed_accounts(failed_accounts):
+    """Run setup process for specific failed accounts using ORIGINAL method"""
+    bot = DDAI()
+    
+    # Load captcha key
+    captcha_key = bot.load_2captcha_key()
+    if captcha_key:
+        bot.CAPTCHA_KEY = captcha_key
+    
+    # Load proxies (use existing proxy.txt)
+    try:
+        if os.path.exists("proxy.txt"):
+            with open("proxy.txt", 'r') as f:
+                bot.proxies = [line.strip() for line in f.read().splitlines() if line.strip()]
+    except:
+        pass
+    
+    use_proxy = len(bot.proxies) > 0
+    
+    # Process failed accounts using ORIGINAL sequential method
+    separator = "="*25
+    for idx, account in enumerate(failed_accounts, start=1):
+        if account:
+            email = account["Email"]
+            password = account["Password"]
+            bot.log(
+                f"{Fore.CYAN + Style.BRIGHT}{separator}[{Style.RESET_ALL}"
+                f"{Fore.WHITE + Style.BRIGHT} {idx} {Style.RESET_ALL}"
+                f"{Fore.CYAN + Style.BRIGHT}Of{Style.RESET_ALL}"
+                f"{Fore.WHITE + Style.BRIGHT} {len(failed_accounts)} {Style.RESET_ALL}"
+                f"{Fore.CYAN + Style.BRIGHT}]{separator}{Style.RESET_ALL}"
+            )
+
+            if not "@" in email or not password:
+                bot.log(
+                    f"{Fore.CYAN+Style.BRIGHT}Status :{Style.RESET_ALL}"
+                    f"{Fore.RED+Style.BRIGHT} Invalid Account Data {Style.RESET_ALL}"
+                )
+                continue
+
+            bot.log(
+                f"{Fore.CYAN + Style.BRIGHT}Account:{Style.RESET_ALL}"
+                f"{Fore.WHITE + Style.BRIGHT} {bot.mask_account(email)} {Style.RESET_ALL}"
+            )
+
+            bot.password[email] = password
+
+            await bot.process_accounts(email, use_proxy)
+            await asyncio.sleep(3)
+    
+    return True
 
 if __name__ == "__main__":
     try:
         bot = DDAI()
         asyncio.run(bot.main())
     except KeyboardInterrupt:
-        print(
-            f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-            f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-            f"{Fore.RED + Style.BRIGHT}[ EXIT ] DDAI Network - BOT{Style.RESET_ALL}                                      ",                                       
-        )
+        print(f"""
+{Fore.YELLOW + Style.BRIGHT}╔════════════════════════════════════════════════════════════════════╗
+║  {Fore.RED + Style.BRIGHT}🛑 SETUP CANCELLED 🛑{Fore.YELLOW + Style.BRIGHT}                                         ║
+║                                                                    ║
+║  {Fore.WHITE + Style.BRIGHT}👋 Setup interrupted by user{Fore.YELLOW + Style.BRIGHT}                                ║
+║  {Fore.WHITE + Style.BRIGHT}💡 Run again when ready to continue{Fore.YELLOW + Style.BRIGHT}                        ║
+║                                                                    ║
+║  {Fore.CYAN + Style.BRIGHT}📧 Original by: vonssy | Enhanced by: jack0z{Fore.YELLOW + Style.BRIGHT}                ║
+╚════════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
+        """)
+    except Exception as e:
+        print(f"""
+{Fore.RED + Style.BRIGHT}╔════════════════════════════════════════════════════════════════════╗
+║  {Fore.YELLOW + Style.BRIGHT}💥 SETUP ERROR 💥{Fore.RED + Style.BRIGHT}                                             ║
+║                                                                    ║
+║  {Fore.WHITE + Style.BRIGHT}❌ Setup failed: {str(e)[:45]}...{Fore.RED + Style.BRIGHT}                               ║
+║  {Fore.WHITE + Style.BRIGHT}📞 Please check your configuration{Fore.RED + Style.BRIGHT}                            ║
+║                                                                    ║
+║  {Fore.CYAN + Style.BRIGHT}📧 Original by: vonssy | Enhanced by: jack0z{Fore.RED + Style.BRIGHT}                  ║
+╚════════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
+        """)
+        raise

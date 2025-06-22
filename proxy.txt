@@ -1,3 +1,22 @@
-ip:port # Default Protcol HTTP.
-protocol://ip:port
-protocol://user:pass@ip:port
+# Sample proxy formats - Replace with your actual proxies
+# Format 1: IP:PORT (will auto-add http://)
+192.168.1.100:8080
+203.0.113.195:3128
+
+# Format 2: Protocol://IP:PORT
+http://198.51.100.178:8080
+https://203.0.113.0:3128
+socks4://192.0.2.146:1080
+socks5://198.51.100.200:1080
+
+# Format 3: With Authentication
+http://username:password@proxy.example.com:8080
+socks5://user123:pass456@198.51.100.50:1080
+
+# Format 4: Premium Proxy Services Examples
+http://session-12345:password@rotating.proxy.com:8000
+http://user-session123:pass@premium.proxy.net:10000
+
+# Add your actual proxies below (remove the # comments)
+# your.proxy.server:8080
+# another.proxy.com:3128

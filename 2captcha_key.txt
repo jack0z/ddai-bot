@@ -1,1 +1,1 @@
-your_2captcha_key
+YOUR_2CAPTCHA_API_KEY_HERE
